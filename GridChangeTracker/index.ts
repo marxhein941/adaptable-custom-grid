@@ -1,17 +1,17 @@
 import { IInputs, IOutputs } from "./generated/ManifestTypes";
-import { HelloWorld, IHelloWorldProps } from "./HelloWorld";
+import { GridComponent, IGridProps } from "./components/GridComponent";
 import * as React from "react";
-import DataSetInterfaces = ComponentFramework.PropertyHelper.DataSetApi;
-type DataSet = ComponentFramework.PropertyTypes.DataSet;
 
 export class GridChangeTracker implements ComponentFramework.ReactControl<IInputs, IOutputs> {
     private notifyOutputChanged: () => void;
+    private context: ComponentFramework.Context<IInputs>;
+    private changedRecords: Map<string, any>;
 
     /**
-     * Empty constructor.
+     * Constructor
      */
     constructor() {
-        // Empty
+        this.changedRecords = new Map();
     }
 
     /**
@@ -27,6 +27,14 @@ export class GridChangeTracker implements ComponentFramework.ReactControl<IInput
         state: ComponentFramework.Dictionary
     ): void {
         this.notifyOutputChanged = notifyOutputChanged;
+        this.context = context;
+
+        // Log initialization
+        console.log('GridChangeTracker initialized', {
+            dataset: context.parameters.gridDataset,
+            enableChangeTracking: context.parameters.enableChangeTracking?.raw,
+            aggregationMode: context.parameters.aggregationMode?.raw
+        });
     }
 
     /**
@@ -35,10 +43,102 @@ export class GridChangeTracker implements ComponentFramework.ReactControl<IInput
      * @returns ReactElement root react element for the control
      */
     public updateView(context: ComponentFramework.Context<IInputs>): React.ReactElement {
-        const props: IHelloWorldProps = { name: 'Power Apps' };
-        return React.createElement(
-            HelloWorld, props
-        );
+        this.context = context;
+
+        // Get dataset
+        const dataset = context.parameters.gridDataset;
+
+        // Build props for React component
+        const props: IGridProps = {
+            dataset: dataset,
+            enableChangeTracking: context.parameters.enableChangeTracking?.raw ?? true,
+            changedCellColor: context.parameters.changedCellColor?.raw || "#FFF4CE",
+            aggregationMode: Number(context.parameters.aggregationMode?.raw || 0),
+            showChangeIndicator: context.parameters.showChangeIndicator?.raw ?? true,
+            onCellChange: this.handleCellChange.bind(this),
+            onSave: this.handleSave.bind(this)
+        };
+
+        // Log update
+        console.log('GridChangeTracker updateView', {
+            recordCount: dataset.sortedRecordIds?.length || 0,
+            columns: dataset.columns?.length || 0,
+            hasChanges: this.changedRecords.size > 0
+        });
+
+        // Render React component
+        return React.createElement(GridComponent, props);
+    }
+
+    /**
+     * Handle cell change event from the grid
+     */
+    private handleCellChange(recordId: string, columnName: string, newValue: any): void {
+        try {
+            // Track the change
+            if (!this.changedRecords.has(recordId)) {
+                this.changedRecords.set(recordId, {});
+            }
+
+            const recordChanges = this.changedRecords.get(recordId);
+            if (recordChanges) {
+                recordChanges[columnName] = newValue;
+            }
+
+            console.log('Cell changed', { recordId, columnName, newValue });
+
+            // Notify framework
+            this.notifyOutputChanged();
+        } catch (error) {
+            console.error('Error handling cell change:', error);
+        }
+    }
+
+    /**
+     * Handle save event from the grid
+     */
+    private async handleSave(): Promise<void> {
+        try {
+            console.log('Starting save operation', {
+                changedRecordsCount: this.changedRecords.size
+            });
+
+            if (this.changedRecords.size === 0) {
+                console.log('No changes to save');
+                return;
+            }
+
+            const dataset = this.context.parameters.gridDataset;
+            const entityName = dataset.getTargetEntityType();
+            const promises: Promise<ComponentFramework.LookupValue>[] = [];
+
+            // Build update promises
+            this.changedRecords.forEach((changes, recordId) => {
+                console.log('Preparing update for record', { recordId, changes });
+
+                promises.push(
+                    this.context.webAPI.updateRecord(entityName, recordId, changes)
+                );
+            });
+
+            // Execute all updates
+            await Promise.all(promises);
+
+            console.log('Save operation completed successfully');
+
+            // Clear changed records
+            this.changedRecords.clear();
+
+            // Refresh dataset
+            dataset.refresh();
+
+            // Notify framework
+            this.notifyOutputChanged();
+        } catch (error) {
+            console.error('Error saving changes:', error);
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            throw new Error(`Failed to save changes: ${errorMessage}`);
+        }
     }
 
     /**
@@ -54,6 +154,9 @@ export class GridChangeTracker implements ComponentFramework.ReactControl<IInput
      * i.e. cancelling any pending remote calls, removing listeners, etc.
      */
     public destroy(): void {
-        // Add code to cleanup control if necessary
+        // Clear any pending changes
+        this.changedRecords.clear();
+
+        console.log('GridChangeTracker destroyed');
     }
 }

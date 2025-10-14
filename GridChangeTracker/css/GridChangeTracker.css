@@ -1,0 +1,169 @@
+/* Grid Change Tracker Styles */
+
+.grid-change-tracker-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    width: 100%;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.grid-change-tracker-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background-color: #f3f2f1;
+    border-bottom: 1px solid #edebe9;
+}
+
+.grid-change-tracker-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #323130;
+}
+
+.grid-change-tracker-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.grid-content {
+    flex: 1;
+    overflow: auto;
+}
+
+/* Changed cell styling */
+.changed-cell {
+    position: relative;
+    font-weight: 600;
+}
+
+.changed-cell-input {
+    border: 1px solid #0078d4 !important;
+}
+
+.change-indicator {
+    color: #d13438;
+    margin-right: 4px;
+    font-weight: bold;
+}
+
+/* Aggregation footer styling */
+.aggregation-footer {
+    display: flex;
+    border-top: 2px solid #323130;
+    background-color: #faf9f8;
+    padding: 8px 12px;
+    font-weight: 600;
+    min-height: 42px;
+}
+
+.aggregation-cell {
+    flex: 1;
+    padding: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+}
+
+.aggregation-label {
+    font-size: 12px;
+    color: #605e5c;
+    margin-right: 8px;
+}
+
+.aggregation-value {
+    font-size: 14px;
+    color: #323130;
+}
+
+/* Save button styling */
+.save-button {
+    background-color: #0078d4;
+    color: white;
+    border: none;
+    padding: 6px 16px;
+    border-radius: 2px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    transition: background-color 0.2s;
+}
+
+.save-button:hover {
+    background-color: #106ebe;
+}
+
+.save-button:disabled {
+    background-color: #c8c6c4;
+    cursor: not-allowed;
+}
+
+/* Status indicator */
+.status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: #605e5c;
+}
+
+.changes-count {
+    padding: 2px 8px;
+    background-color: #fef0cd;
+    border-radius: 10px;
+    font-weight: 600;
+    color: #323130;
+}
+
+/* Loading spinner */
+.loading-spinner {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+}
+
+/* Error message */
+.error-message {
+    background-color: #fde7e9;
+    border: 1px solid #d13438;
+    color: #a4262c;
+    padding: 8px 12px;
+    margin: 8px 12px;
+    border-radius: 2px;
+    font-size: 12px;
+}
+
+/* Success message */
+.success-message {
+    background-color: #dff6dd;
+    border: 1px solid #107c10;
+    color: #107c10;
+    padding: 8px 12px;
+    margin: 8px 12px;
+    border-radius: 2px;
+    font-size: 12px;
+}
+
+/* Cell editor styling */
+.cell-editor {
+    width: 100%;
+    border: 1px solid #8a8886;
+    padding: 4px 8px;
+    font-size: 14px;
+    font-family: inherit;
+}
+
+.cell-editor:focus {
+    outline: none;
+    border-color: #0078d4;
+    box-shadow: 0 0 0 1px #0078d4;
+}
+
+/* Editable cell hover effect */
+.editable-cell:hover {
+    background-color: #f3f2f1;
+    cursor: pointer;
+}
