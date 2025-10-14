@@ -7,31 +7,36 @@
   "environments": {
     "dev": {
       "name": "DEV",
-      "url": "https://yourorg-dev.crm.dynamics.com",
+      "url": "https://d365-salesandcustomerservice-dev.crm6.dynamics.com",
       "publisherPrefix": "ada",
-      "description": "Development environment - Update URL before use"
+      "description": "Development environment - Opal D365 Sales and Customer Service (APAC region)",
+      "region": "crm6 (APAC)",
+      "environmentId": "7bb0a84d-b404-edfa-8662-ae4e0c225cc5"
     },
     "pp": {
       "name": "PP",
-      "url": "https://yourorg-pp.crm.dynamics.com",
+      "url": "https://d365-salesandcustomerservice-dev.crm6.dynamics.com",
       "publisherPrefix": "ada",
-      "description": "Pre-production environment - Update URL before use"
+      "description": "Pre-production environment - Currently same as DEV",
+      "region": "crm6 (APAC)",
+      "environmentId": "7bb0a84d-b404-edfa-8662-ae4e0c225cc5"
     },
     "prod": {
       "name": "PROD",
-      "url": "https://yourorg.crm.dynamics.com",
+      "url": "https://yourorg.crm6.dynamics.com",
       "publisherPrefix": "ada",
-      "description": "Production environment - Update URL before use"
+      "description": "Production environment - Update URL when ready",
+      "region": "crm6 (APAC)"
     }
   },
   "instructions": {
     "note": "This file is for reference only. Actual authentication is done via pac CLI.",
     "publisherInfo": "Publisher: Adaptable | Prefix: ada (becomes ada_ in Dataverse)",
+    "configuredEnvironment": "d365-salesandcustomerservice-dev.crm6.dynamics.com",
     "setup": [
-      "1. Update the URLs above to match your actual Dataverse environments",
-      "2. Publisher prefix is set to 'ada' for all Adaptable components",
-      "3. Authenticate: pac auth create --url [environment-url] --name [name]",
-      "4. Deploy using: deploy-pp.ps1 or deploy-dev.ps1 scripts"
+      "1. Authenticate: pac auth create --url https://d365-salesandcustomerservice-dev.crm6.dynamics.com --name PP",
+      "2. Deploy using: deploy-pp.ps1 (prefix 'ada' is already configured)",
+      "3. Add control to your app in make.powerapps.com"
     ]
   }
 }

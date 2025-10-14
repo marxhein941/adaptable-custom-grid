@@ -12,7 +12,8 @@
       "Bash(gh auth:*)",
       "Bash(gh repo create:*)",
       "Bash(npm run build)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(powershell:*)"
     ],
     "deny": [],
     "ask": []
