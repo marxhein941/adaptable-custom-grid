@@ -1,31 +1,37 @@
 {
+  "publisher": {
+    "name": "Adaptable",
+    "prefix": "ada",
+    "description": "Adaptable company publisher for sealed components"
+  },
   "environments": {
     "dev": {
       "name": "DEV",
       "url": "https://yourorg-dev.crm.dynamics.com",
-      "publisherPrefix": "abc",
-      "description": "Development environment - Update URL and prefix before use"
+      "publisherPrefix": "ada",
+      "description": "Development environment - Update URL before use"
     },
     "pp": {
       "name": "PP",
       "url": "https://yourorg-pp.crm.dynamics.com",
-      "publisherPrefix": "abc",
-      "description": "Pre-production environment - Update URL and prefix before use"
+      "publisherPrefix": "ada",
+      "description": "Pre-production environment - Update URL before use"
     },
     "prod": {
       "name": "PROD",
       "url": "https://yourorg.crm.dynamics.com",
-      "publisherPrefix": "abc",
-      "description": "Production environment - Update URL and prefix before use"
+      "publisherPrefix": "ada",
+      "description": "Production environment - Update URL before use"
     }
   },
   "instructions": {
     "note": "This file is for reference only. Actual authentication is done via pac CLI.",
+    "publisherInfo": "Publisher: Adaptable | Prefix: ada (becomes ada_ in Dataverse)",
     "setup": [
       "1. Update the URLs above to match your actual Dataverse environments",
-      "2. Update publisherPrefix to match your organization's prefix",
+      "2. Publisher prefix is set to 'ada' for all Adaptable components",
       "3. Authenticate: pac auth create --url [environment-url] --name [name]",
-      "4. Deploy using: npm run deploy:[env] or use the deploy-*.ps1 scripts"
+      "4. Deploy using: deploy-pp.ps1 or deploy-dev.ps1 scripts"
     ]
   }
 }

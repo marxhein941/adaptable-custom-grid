@@ -1,12 +1,14 @@
 # Deploy PCF Control to Pre-Production Environment
 # This script builds and deploys the Grid Change Tracker control to PP
+# Publisher: Adaptable | Prefix: ada
 
 param(
-    [string]$PublisherPrefix = "abc"  # UPDATE THIS TO YOUR ACTUAL PREFIX
+    [string]$PublisherPrefix = "ada"
 )
 
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "Grid Change Tracker - PP Deployment" -ForegroundColor Cyan
+Write-Host "Publisher: Adaptable | Prefix: ada" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 

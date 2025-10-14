@@ -2,6 +2,9 @@
 
 Complete guide for deploying the PCF control to Power Platform environments.
 
+**Publisher:** Adaptable
+**Publisher Prefix:** ada (becomes `ada_` in Dataverse)
+
 ## Prerequisites
 
 - Power Platform CLI installed ([Download](https://aka.ms/PowerAppsCLI))
@@ -24,10 +27,14 @@ The Power Platform CLI manages authentication securely through profiles:
 Edit `environments.json` and update:
 ```json
 {
+  "publisher": {
+    "name": "Adaptable",
+    "prefix": "ada"
+  },
   "environments": {
     "pp": {
       "url": "https://YOUR-ACTUAL-ORG-pp.crm.dynamics.com",  // Update this
-      "publisherPrefix": "YOUR-PREFIX"                        // Update this
+      "publisherPrefix": "ada"                                // Already set
     }
   }
 }
@@ -35,7 +42,7 @@ Edit `environments.json` and update:
 
 **Find your values:**
 - **Environment URL**: Go to [Power Platform Admin Center](https://admin.powerplatform.microsoft.com/) → Select your environment → Copy the Environment URL
-- **Publisher Prefix**: Go to make.powerapps.com → Solutions → Select your solution → Publisher → Note the prefix (e.g., "contoso", "abc")
+- **Publisher Prefix**: Already set to `ada` for all Adaptable components
 
 ### 2. Authenticate to Your Environment
 
@@ -65,12 +72,14 @@ pac auth select --name PP
 
 **Deploy to PP:**
 ```powershell
-.\deploy-pp.ps1 -PublisherPrefix "YOUR-PREFIX"
+.\deploy-pp.ps1
+# Publisher prefix 'ada' is already set as default
 ```
 
 **Deploy to DEV:**
 ```powershell
-.\deploy-dev.ps1 -PublisherPrefix "YOUR-PREFIX"
+.\deploy-dev.ps1
+# Publisher prefix 'ada' is already set as default
 ```
 
 The scripts will:
@@ -90,7 +99,7 @@ pac auth select --name PP
 npm run build
 
 # 3. Deploy
-pac pcf push --publisher-prefix YOUR-PREFIX
+pac pcf push --publisher-prefix ada
 ```
 
 ## After Deployment
@@ -132,7 +141,7 @@ npm run build
 
 # 3. Deploy (increment version in ControlManifest.Input.xml first!)
 pac auth select --name PP
-pac pcf push --publisher-prefix YOUR-PREFIX
+pac pcf push --publisher-prefix ada
 ```
 
 **Important:** Increment the version number in `ControlManifest.Input.xml` before each deployment:
@@ -209,7 +218,7 @@ mkdir GridChangeTrackerSolution
 cd GridChangeTrackerSolution
 
 # 2. Initialize solution
-pac solution init --publisher-name "YourCompany" --publisher-prefix "YOUR-PREFIX"
+pac solution init --publisher-name "Adaptable" --publisher-prefix "ada"
 
 # 3. Add PCF reference
 pac solution add-reference --path ../adaptable-custom-grid
