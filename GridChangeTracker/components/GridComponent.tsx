@@ -10,6 +10,7 @@ import { ChangeTracker } from '../utils/changeTracker';
 import { calculateAggregations, AggregationMode, getAggregationMode, AggregationResult } from '../utils/aggregations';
 import { AggregationFooter } from './AggregationFooter';
 import { BUILD_TIMESTAMP } from '../buildConstants';
+import { debounce } from '../utils/debounce';
 
 export interface IGridProps {
     dataset: ComponentFramework.PropertyTypes.DataSet;
@@ -39,11 +40,18 @@ interface IGridState {
 
 export class GridComponent extends React.Component<IGridProps, IGridState> {
     private changeTracker: ChangeTracker;
+    private successMessageTimer?: NodeJS.Timeout;
+    private debouncedNotifyChange: (recordId: string, columnName: string, value: any) => void;
 
     constructor(props: IGridProps) {
         super(props);
 
         this.changeTracker = new ChangeTracker();
+
+        // Debounce cell change notifications to reduce rapid updates
+        this.debouncedNotifyChange = debounce((recordId: string, columnName: string, value: any) => {
+            this.props.onCellChange(recordId, columnName, value);
+        }, 300);
 
         this.state = {
             currentData: [],
@@ -63,6 +71,13 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
 
     componentDidMount(): void {
         this.loadData();
+    }
+
+    componentWillUnmount(): void {
+        // Clean up timers to prevent memory leaks
+        if (this.successMessageTimer) {
+            clearTimeout(this.successMessageTimer);
+        }
     }
 
     componentDidUpdate(prevProps: IGridProps): void {
@@ -306,6 +321,14 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
             const isSorted = sortColumn === col.name;
             const hasFilter = !!columnFilters[col.name];
 
+            // Debug: Log column metadata to verify description availability
+            console.log(`[Column ${col.name}]`, {
+                displayName: col.displayName,
+                description: (col as any).description,
+                metadata: (col as any).metadata,
+                tooltip: (col as any).tooltip
+            });
+
             // Preserve existing column width if it exists (user has manually resized)
             const existingColumn = stateColumns.find(c => c.key === col.name);
 
@@ -354,37 +377,74 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
         const filterValue = this.state.columnFilters[columnName] || '';
         const column = this.props.dataset.columns.find(col => col.name === columnName);
         const displayName = column?.displayName || columnName;
-        const description = (column as any)?.description || '';
 
-        // Use description if available, otherwise fall back to display name
-        const tooltipContent = description || displayName;
+        // Try multiple sources for description
+        const description = (column as any)?.description ||
+                           (column as any)?.metadata?.description ||
+                           (column as any)?.tooltip ||
+                           '';
+
+        const hasDescription = typeof description === 'string' && description.trim().length > 0;
+
+        // Header content with optional Info icon
+        const headerContent = (
+            <React.Fragment>
+                <span className="column-name">{displayName}</span>
+                {hasDescription && (
+                    <Icon
+                        iconName="Info"
+                        className="column-info-icon"
+                        styles={{
+                            root: {
+                                marginLeft: 4,
+                                fontSize: 12,
+                                color: '#605e5c',
+                                verticalAlign: 'middle',
+                                cursor: 'help'
+                            }
+                        }}
+                    />
+                )}
+            </React.Fragment>
+        );
 
         const titleContent = (
             <div className="column-header-title">
-                {displayName}
+                {hasDescription ? (
+                    <TooltipHost
+                        content={
+                            <div style={{ maxWidth: 300 }}>
+                                <strong>{displayName}</strong>
+                                <br />
+                                <span style={{ fontSize: '12px' }}>{description}</span>
+                            </div>
+                        }
+                        id={`col-tooltip-${columnName}`}
+                        calloutProps={{
+                            gapSpace: 0,
+                            beakWidth: 10
+                        }}
+                        styles={{
+                            root: { display: 'inline-block', cursor: 'help' }
+                        }}
+                    >
+                        {headerContent}
+                    </TooltipHost>
+                ) : (
+                    headerContent
+                )}
             </div>
         );
 
         return (
             <div className="column-header-container">
-                <TooltipHost
-                    content={tooltipContent}
-                    id={`tooltip-${columnName}`}
-                    calloutProps={{
-                        gapSpace: 0,
-                        beakWidth: 8
-                    }}
-                    styles={{
-                        root: { display: 'block' }
-                    }}
-                >
-                    {titleContent}
-                </TooltipHost>
+                {titleContent}
                 <div className="column-filter" onClick={(e) => e.stopPropagation()}>
                     <TextField
                         placeholder="Filter..."
                         value={filterValue}
                         onChange={(e, newValue) => this.handleFilter(columnName, newValue || '')}
+                        ariaLabel={`Filter ${displayName} column`}
                         styles={{
                             root: { marginTop: 4 },
                             field: { fontSize: 12, padding: '2px 4px' }
@@ -395,6 +455,9 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
                         <Icon
                             iconName="Cancel"
                             onClick={() => this.clearFilter(columnName)}
+                            aria-label={`Clear filter on ${displayName}`}
+                            role="button"
+                            tabIndex={0}
                             styles={{
                                 root: {
                                     cursor: 'pointer',
@@ -415,6 +478,8 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
         const isChanged = this.changeTracker.isCellChanged(item.id, columnName);
         const value = item[columnName] || '';
         const isEditable = this.isFieldEditable(columnName);
+        const column = this.props.dataset.columns.find(col => col.name === columnName);
+        const displayName = column?.displayName || columnName;
 
         const cellStyle: React.CSSProperties = {
             backgroundColor: isChanged && this.props.enableChangeTracking
@@ -428,23 +493,28 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
             ? (isChanged ? 'changed-cell' : 'editable-cell')
             : 'readonly-cell';
 
+        const ariaLabel = isEditable
+            ? `Edit ${displayName} for record ${item.id}${isChanged ? ' (modified)' : ''}`
+            : `${displayName}: ${value} (read-only)`;
+
         return (
-            <div style={cellStyle} className={cellClassName} tabIndex={-1}>
+            <div style={cellStyle} className={cellClassName} tabIndex={-1} role="gridcell" aria-label={ariaLabel}>
                 {this.props.enableChangeTracking && this.props.showChangeIndicator && isChanged && (
-                    <span className="change-indicator">*</span>
+                    <span className="change-indicator" aria-label="Modified">*</span>
                 )}
                 {isEditable ? (
                     <TextField
                         value={value}
                         onChange={(e, newValue) => this.handleCellChange(item.id, columnName, newValue)}
                         borderless
+                        ariaLabel={`Edit ${displayName}`}
                         styles={{
                             root: { display: 'inline-block', width: '100%' },
                             fieldGroup: { border: 'none', background: 'transparent' }
                         }}
                     />
                 ) : (
-                    <span className="readonly-text" title="This field is read-only">
+                    <span className="readonly-text" title="This field is read-only" role="text">
                         {value}
                     </span>
                 )}
@@ -470,8 +540,8 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
         // Track the change
         this.changeTracker.trackChange(recordId, columnName, newValue);
 
-        // Notify parent component
-        this.props.onCellChange(recordId, columnName, newValue);
+        // Notify parent component with debouncing to reduce rapid updates
+        this.debouncedNotifyChange(recordId, columnName, newValue);
 
         this.setState({
             currentData: updatedCurrentData,
@@ -504,7 +574,10 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
             });
 
             // Clear success message after 3 seconds
-            setTimeout(() => {
+            if (this.successMessageTimer) {
+                clearTimeout(this.successMessageTimer);
+            }
+            this.successMessageTimer = setTimeout(() => {
                 this.setState({ successMessage: null });
             }, 3000);
         } catch (error) {
@@ -564,12 +637,16 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
                             text="Discard"
                             onClick={this.handleDiscard}
                             disabled={!hasChanges || isSaving}
+                            ariaLabel={`Discard ${changedCount} pending changes`}
+                            title="Discard all changes and reload original data"
                         />
                         <PrimaryButton
                             text={isSaving ? 'Saving...' : 'Save Changes'}
                             onClick={this.handleSave}
                             disabled={!hasChanges || isSaving}
                             className="save-button"
+                            ariaLabel={isSaving ? 'Saving changes' : `Save ${changedCount} pending changes`}
+                            title={isSaving ? 'Saving changes to server' : 'Save all changes to server'}
                         />
                     </div>
                 </div>

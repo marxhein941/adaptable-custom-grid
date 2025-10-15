@@ -1,5 +1,6 @@
 import { IInputs, IOutputs } from "./generated/ManifestTypes";
 import { GridComponent, IGridProps } from "./components/GridComponent";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import * as React from "react";
 
 export class GridChangeTracker implements ComponentFramework.ReactControl<IInputs, IOutputs> {
@@ -67,8 +68,12 @@ export class GridChangeTracker implements ComponentFramework.ReactControl<IInput
             hasChanges: this.changedRecords.size > 0
         });
 
-        // Render React component
-        return React.createElement(GridComponent, props);
+        // Render React component wrapped in ErrorBoundary
+        return React.createElement(
+            ErrorBoundary,
+            null,
+            React.createElement(GridComponent, props)
+        );
     }
 
     /**

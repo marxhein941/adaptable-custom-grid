@@ -34,6 +34,10 @@
               default-value="0">
       <value name="None" display-name-key="None">0</value>
       <value name="Sum" display-name-key="Sum (Total)">1</value>
+      <value name="Average" display-name-key="Average">2</value>
+      <value name="Count" display-name-key="Count">3</value>
+      <value name="Min" display-name-key="Minimum">4</value>
+      <value name="Max" display-name-key="Maximum">5</value>
     </property>
 
     <property name="showChangeIndicator"

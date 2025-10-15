@@ -333,18 +333,18 @@
     background-color: #edebe9;
 }
 
-/* Tooltip styling */
-.ms-Tooltip,
-.ms-Tooltip *,
-.ms-TooltipHost .ms-Callout,
-.ms-Callout,
-.ms-Callout-main,
-.ms-Layer .ms-Callout-main {
+/* Tooltip styling - scoped to component only */
+.grid-change-tracker-container .ms-Tooltip,
+.grid-change-tracker-container .ms-Tooltip *,
+.grid-change-tracker-container .ms-TooltipHost .ms-Callout,
+.grid-change-tracker-container .ms-Callout,
+.grid-change-tracker-container .ms-Callout-main,
+.grid-change-tracker-container .ms-Layer .ms-Callout-main {
     background-color: #edebe9 !important;
     color: #000000 !important;
 }
 
-.ms-Tooltip .ms-Callout-main {
+.grid-change-tracker-container .ms-Tooltip .ms-Callout-main {
     max-width: 400px !important;
     padding: 8px 12px !important;
     background-color: #edebe9 !important;
@@ -357,19 +357,40 @@
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15) !important;
 }
 
-.ms-Tooltip .ms-Callout-beak,
-.ms-Callout-beak,
-.ms-Callout-beakCurtain {
+.grid-change-tracker-container .ms-Tooltip .ms-Callout-beak,
+.grid-change-tracker-container .ms-Callout-beak,
+.grid-change-tracker-container .ms-Callout-beakCurtain {
     background-color: #edebe9 !important;
 }
 
-/* Override any theme colors */
-div[class*="ms-Callout"] {
+/* Override any theme colors - scoped to component only */
+.grid-change-tracker-container div[class*="ms-Callout"] {
     background-color: #edebe9 !important;
     color: #000000 !important;
 }
 
-div[class*="ms-Tooltip"] {
+.grid-change-tracker-container div[class*="ms-Tooltip"] {
     background-color: #edebe9 !important;
     color: #000000 !important;
+}
+
+/* Column header tooltip enhancements */
+.column-info-icon {
+    cursor: help;
+    transition: opacity 0.2s, color 0.2s;
+    opacity: 0.6;
+}
+
+.column-header-title:hover .column-info-icon {
+    opacity: 1 !important;
+    color: #0078d4 !important;
+}
+
+.column-name {
+    cursor: default;
+}
+
+.column-header-title:has(.column-info-icon) .column-name {
+    border-bottom: 1px dotted #8a8886;
+    cursor: help;
 }
