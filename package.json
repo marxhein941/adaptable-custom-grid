@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Project containing your PowerApps Component Framework (PCF) control.",
   "scripts": {
+    "prebuild": "node scripts/update-build-timestamp.js",
     "build": "pcf-scripts build",
     "clean": "pcf-scripts clean",
     "lint": "pcf-scripts lint",

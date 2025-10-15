@@ -8,6 +8,7 @@ import { Icon } from '@fluentui/react/lib/Icon';
 import { ChangeTracker } from '../utils/changeTracker';
 import { calculateAggregations, AggregationMode, getAggregationMode, AggregationResult } from '../utils/aggregations';
 import { AggregationFooter } from './AggregationFooter';
+import { BUILD_TIMESTAMP } from '../buildConstants';
 
 export interface IGridProps {
     dataset: ComponentFramework.PropertyTypes.DataSet;
@@ -230,15 +231,16 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
                 key: col.name,
                 name: col.displayName,
                 fieldName: col.name,
-                minWidth: 100,
-                maxWidth: 200,
+                minWidth: 150,
+                maxWidth: 300,
                 isResizable: true,
                 isSorted: isSorted,
                 isSortedDescending: isSorted ? isSortDescending : undefined,
                 columnActionsMode: ColumnActionsMode.hasDropdown,
                 onColumnClick: (ev, column) => this.handleSort(column),
                 onRender: (item: any) => this.renderCell(item, col.name),
-                onRenderHeader: () => this.renderColumnHeader(col.name, hasFilter)
+                onRenderHeader: () => this.renderColumnHeader(col.name, hasFilter),
+                flexGrow: 0
             };
         });
     }
@@ -292,11 +294,12 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
             backgroundColor: isChanged && this.props.enableChangeTracking
                 ? this.props.changedCellColor
                 : 'transparent',
-            padding: '4px 8px'
+            padding: '4px 8px',
+            transition: 'all 0.2s ease-in-out'
         };
 
         return (
-            <div style={cellStyle} className={isChanged ? 'changed-cell' : 'editable-cell'}>
+            <div style={cellStyle} className={isChanged ? 'changed-cell' : 'editable-cell'} tabIndex={-1}>
                 {this.props.enableChangeTracking && this.props.showChangeIndicator && isChanged && (
                     <span className="change-indicator">*</span>
                 )}
@@ -306,7 +309,7 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
                     borderless
                     styles={{
                         root: { display: 'inline-block', width: '100%' },
-                        fieldGroup: { border: 'none' }
+                        fieldGroup: { border: 'none', background: 'transparent' }
                     }}
                 />
             </div>
@@ -409,6 +412,9 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
                                 ({filteredData.length} of {currentData.length} records)
                             </span>
                         )}
+                        <span className="deployment-timestamp" title="Last deployment">
+                            v{BUILD_TIMESTAMP}
+                        </span>
                     </div>
                     <div className="grid-change-tracker-actions">
                         {hasChanges && (
@@ -456,7 +462,7 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
                     <DetailsList
                         items={filteredData}
                         columns={columns}
-                        layoutMode={DetailsListLayoutMode.justified}
+                        layoutMode={DetailsListLayoutMode.fixedColumns}
                         selectionMode={SelectionMode.none}
                         isHeaderVisible={true}
                     />

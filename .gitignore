@@ -21,3 +21,6 @@
 
 # macos
 .DS_Store
+
+# auto-generated build constants
+GridChangeTracker/buildConstants.ts

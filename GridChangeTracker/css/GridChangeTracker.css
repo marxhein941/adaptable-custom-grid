@@ -30,7 +30,43 @@
 
 .grid-content {
     flex: 1;
-    overflow: auto;
+    overflow-x: auto;
+    overflow-y: auto;
+    width: 100%;
+}
+
+/* Ensure DetailsList respects horizontal scrolling */
+.grid-content .ms-DetailsList {
+    min-width: 100%;
+    width: max-content;
+}
+
+/* Smooth scrollbar styling */
+.grid-content::-webkit-scrollbar {
+    height: 12px;
+    width: 12px;
+}
+
+.grid-content::-webkit-scrollbar-track {
+    background-color: #f3f2f1;
+    border-radius: 10px;
+}
+
+.grid-content::-webkit-scrollbar-thumb {
+    background-color: #c8c6c4;
+    border-radius: 10px;
+    border: 2px solid #f3f2f1;
+}
+
+.grid-content::-webkit-scrollbar-thumb:hover {
+    background-color: #a19f9d;
+}
+
+/* Prevent column headers from wrapping */
+.grid-content .ms-DetailsHeader-cellTitle {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 /* Changed cell styling */
@@ -168,6 +204,28 @@
     cursor: pointer;
 }
 
+/* Enhanced focus styles for selected/editing cell */
+.editable-cell:focus-within,
+.changed-cell:focus-within {
+    outline: 2px solid #0078d4;
+    outline-offset: -2px;
+    background-color: #f3f9fd;
+    box-shadow: 0 0 8px rgba(0, 120, 212, 0.3);
+    position: relative;
+    z-index: 1;
+}
+
+.editable-cell input:focus,
+.changed-cell input:focus {
+    outline: none;
+}
+
+/* Additional highlight for TextField when focused */
+.editable-cell .ms-TextField-fieldGroup:focus-within,
+.changed-cell .ms-TextField-fieldGroup:focus-within {
+    border-color: transparent !important;
+}
+
 /* Column header with filter */
 .column-header-container {
     width: 100%;
@@ -202,6 +260,18 @@
     background-color: #deecf9;
     padding: 2px 8px;
     border-radius: 10px;
+}
+
+/* Deployment timestamp indicator */
+.deployment-timestamp {
+    margin-left: 12px;
+    font-size: 10px;
+    font-weight: normal;
+    color: #605e5c;
+    background-color: #edebe9;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: 'Consolas', 'Courier New', monospace;
 }
 
 /* Sort indicator styling */
