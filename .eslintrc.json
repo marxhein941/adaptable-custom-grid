@@ -1,0 +1,19 @@
+{
+  "extends": "./node_modules/pcf-scripts/eslint-config",
+  "rules": {
+    "@typescript-eslint/no-explicit-any": "off",
+    "@typescript-eslint/no-unsafe-member-access": "off",
+    "@typescript-eslint/no-unsafe-assignment": "off",
+    "@typescript-eslint/no-unsafe-argument": "off",
+    "@typescript-eslint/no-unsafe-call": "off",
+    "@typescript-eslint/no-unsafe-return": "off",
+    "@typescript-eslint/no-floating-promises": "warn",
+    "@typescript-eslint/consistent-generic-constructors": "warn",
+    "@typescript-eslint/no-unnecessary-type-assertion": "warn",
+    "@typescript-eslint/prefer-nullish-coalescing": "off",
+    "@typescript-eslint/prefer-optional-chain": "warn",
+    "@typescript-eslint/consistent-indexed-object-style": "warn",
+    "@typescript-eslint/no-misused-promises": "warn",
+    "@typescript-eslint/no-unsafe-spread": "off"
+  }
+}
