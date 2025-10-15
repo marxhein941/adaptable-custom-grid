@@ -5,6 +5,7 @@ import { PrimaryButton, DefaultButton } from '@fluentui/react/lib/Button';
 import { Spinner, SpinnerSize } from '@fluentui/react/lib/Spinner';
 import { MessageBar, MessageBarType } from '@fluentui/react/lib/MessageBar';
 import { Icon } from '@fluentui/react/lib/Icon';
+import { TooltipHost } from '@fluentui/react/lib/Tooltip';
 import { ChangeTracker } from '../utils/changeTracker';
 import { calculateAggregations, AggregationMode, getAggregationMode, AggregationResult } from '../utils/aggregations';
 import { AggregationFooter } from './AggregationFooter';
@@ -16,6 +17,7 @@ export interface IGridProps {
     changedCellColor: string;
     aggregationMode: number;
     showChangeIndicator: boolean;
+    readOnlyFields: string;
     onCellChange: (recordId: string, columnName: string, value: any) => void;
     onSave: () => Promise<void>;
 }
@@ -32,6 +34,7 @@ interface IGridState {
     isSortDescending: boolean;
     columnFilters: { [key: string]: string };
     columns: IColumn[];
+    readOnlyFieldsSet: Set<string>;
 }
 
 export class GridComponent extends React.Component<IGridProps, IGridState> {
@@ -53,7 +56,8 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
             sortColumn: null,
             isSortDescending: false,
             columnFilters: {},
-            columns: []
+            columns: [],
+            readOnlyFieldsSet: this.parseReadOnlyFields(props.readOnlyFields)
         };
     }
 
@@ -71,6 +75,48 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
         if (prevProps.aggregationMode !== this.props.aggregationMode) {
             this.calculateAggregations();
         }
+
+        // Update read-only fields if configuration changes
+        if (prevProps.readOnlyFields !== this.props.readOnlyFields) {
+            this.setState({
+                readOnlyFieldsSet: this.parseReadOnlyFields(this.props.readOnlyFields)
+            });
+        }
+    }
+
+    private parseReadOnlyFields(readOnlyFieldsString: string): Set<string> {
+        if (!readOnlyFieldsString || readOnlyFieldsString.trim() === '') {
+            return new Set<string>();
+        }
+
+        // Split by comma and trim whitespace
+        const fields = readOnlyFieldsString
+            .split(',')
+            .map(field => field.trim())
+            .filter(field => field.length > 0);
+
+        return new Set<string>(fields);
+    }
+
+    private isFieldEditable(columnName: string): boolean {
+        // Check if field is in the read-only configuration
+        if (this.state.readOnlyFieldsSet.has(columnName)) {
+            return false;
+        }
+
+        // Check column metadata for any indicators
+        const column = this.props.dataset.columns.find(col => col.name === columnName);
+        if (!column) {
+            return false;
+        }
+
+        // Check if column is the primary field (usually read-only)
+        if (column.isPrimary) {
+            return false;
+        }
+
+        // Default to editable
+        return true;
     }
 
     private loadData = (): void => {
@@ -222,27 +268,63 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
         });
     }
 
+    private calculateOptimalColumnWidth = (columnName: string, displayName: string, data: any[]): number => {
+        // Base width calculation factors (reduced by 50%)
+        const CHAR_WIDTH = 3; // Average character width in pixels (was 6)
+        const PADDING = -5; // Cell padding + borders (was -10)
+        const MIN_WIDTH = 10; // Reduced by 50% (was 20)
+        const MAX_WIDTH = 100; // Reduced by 50% (was 200)
+        const HEADER_EXTRA = 8; // Extra space for sort icon, filter, dropdown (was 15)
+
+        // Calculate width based on column header name
+        const headerWidth = (displayName.length * CHAR_WIDTH) + HEADER_EXTRA;
+
+        // Calculate width based on content in the first 100 rows (for performance)
+        const sampleData = data.slice(0, 100);
+        const contentWidths = sampleData.map(row => {
+            const value = String(row[columnName] || '');
+            return (value.length * CHAR_WIDTH) + PADDING;
+        });
+
+        const maxContentWidth = contentWidths.length > 0 ? Math.max(...contentWidths) : MIN_WIDTH;
+
+        // Use the larger of header width or content width
+        const optimalWidth = Math.max(headerWidth, maxContentWidth);
+
+        // Clamp between min and max
+        return Math.min(Math.max(optimalWidth, MIN_WIDTH), MAX_WIDTH);
+    }
+
     private buildColumns = (): IColumn[] => {
         if (!this.props.dataset || !this.props.dataset.columns) {
             return [];
         }
 
-        const { sortColumn, isSortDescending, columnFilters, columns: stateColumns } = this.state;
+        const { sortColumn, isSortDescending, columnFilters, columns: stateColumns, filteredData } = this.state;
 
         return this.props.dataset.columns.map(col => {
             const isSorted = sortColumn === col.name;
             const hasFilter = !!columnFilters[col.name];
 
-            // Preserve existing column width if it exists
+            // Preserve existing column width if it exists (user has manually resized)
             const existingColumn = stateColumns.find(c => c.key === col.name);
-            const columnWidth = existingColumn?.currentWidth || 150;
+
+            // Calculate optimal width based on header and content
+            const calculatedWidth = this.calculateOptimalColumnWidth(
+                col.name,
+                col.displayName,
+                filteredData
+            );
+
+            // Use existing width if column was manually resized, otherwise use calculated
+            const columnWidth = existingColumn?.currentWidth || calculatedWidth;
 
             return {
                 key: col.name,
                 name: col.displayName,
                 fieldName: col.name,
-                minWidth: 150,
-                maxWidth: 300,
+                minWidth: 10,
+                maxWidth: 100,
                 currentWidth: columnWidth,
                 isResizable: true,
                 isSorted: isSorted,
@@ -272,12 +354,32 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
         const filterValue = this.state.columnFilters[columnName] || '';
         const column = this.props.dataset.columns.find(col => col.name === columnName);
         const displayName = column?.displayName || columnName;
+        const description = (column as any)?.description || '';
+
+        // Use description if available, otherwise fall back to display name
+        const tooltipContent = description || displayName;
+
+        const titleContent = (
+            <div className="column-header-title">
+                {displayName}
+            </div>
+        );
 
         return (
             <div className="column-header-container">
-                <div className="column-header-title">
-                    {displayName}
-                </div>
+                <TooltipHost
+                    content={tooltipContent}
+                    id={`tooltip-${columnName}`}
+                    calloutProps={{
+                        gapSpace: 0,
+                        beakWidth: 8
+                    }}
+                    styles={{
+                        root: { display: 'block' }
+                    }}
+                >
+                    {titleContent}
+                </TooltipHost>
                 <div className="column-filter" onClick={(e) => e.stopPropagation()}>
                     <TextField
                         placeholder="Filter..."
@@ -312,29 +414,40 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
     private renderCell = (item: any, columnName: string): JSX.Element => {
         const isChanged = this.changeTracker.isCellChanged(item.id, columnName);
         const value = item[columnName] || '';
+        const isEditable = this.isFieldEditable(columnName);
 
         const cellStyle: React.CSSProperties = {
             backgroundColor: isChanged && this.props.enableChangeTracking
                 ? this.props.changedCellColor
-                : 'transparent',
-            padding: '4px 8px',
+                : isEditable ? 'transparent' : '#f3f2f1',
+            padding: '2px 4px',
             transition: 'all 0.2s ease-in-out'
         };
 
+        const cellClassName = isEditable
+            ? (isChanged ? 'changed-cell' : 'editable-cell')
+            : 'readonly-cell';
+
         return (
-            <div style={cellStyle} className={isChanged ? 'changed-cell' : 'editable-cell'} tabIndex={-1}>
+            <div style={cellStyle} className={cellClassName} tabIndex={-1}>
                 {this.props.enableChangeTracking && this.props.showChangeIndicator && isChanged && (
                     <span className="change-indicator">*</span>
                 )}
-                <TextField
-                    value={value}
-                    onChange={(e, newValue) => this.handleCellChange(item.id, columnName, newValue)}
-                    borderless
-                    styles={{
-                        root: { display: 'inline-block', width: '100%' },
-                        fieldGroup: { border: 'none', background: 'transparent' }
-                    }}
-                />
+                {isEditable ? (
+                    <TextField
+                        value={value}
+                        onChange={(e, newValue) => this.handleCellChange(item.id, columnName, newValue)}
+                        borderless
+                        styles={{
+                            root: { display: 'inline-block', width: '100%' },
+                            fieldGroup: { border: 'none', background: 'transparent' }
+                        }}
+                    />
+                ) : (
+                    <span className="readonly-text" title="This field is read-only">
+                        {value}
+                    </span>
+                )}
             </div>
         );
     }

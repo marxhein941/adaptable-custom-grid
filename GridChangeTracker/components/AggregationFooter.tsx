@@ -21,6 +21,8 @@ export const AggregationFooter: React.FC<IAggregationFooterProps> = (props) => {
     // Sync footer scroll with grid scroll
     React.useEffect(() => {
         const gridContent = document.querySelector('.grid-content');
+        const detailsListContent = gridContent?.querySelector('.ms-DetailsList-contentWrapper');
+
         const handleScroll = () => {
             if (footerRef.current && gridContent) {
                 footerRef.current.scrollLeft = gridContent.scrollLeft;
@@ -33,13 +35,49 @@ export const AggregationFooter: React.FC<IAggregationFooterProps> = (props) => {
         }
     }, []);
 
+    // Observe column width changes from the actual rendered grid
+    React.useEffect(() => {
+        const updateColumnWidths = () => {
+            const headerCells = document.querySelectorAll('.ms-DetailsHeader-cell');
+            const footerCells = footerRef.current?.querySelectorAll('.aggregation-cell');
+
+            if (headerCells.length > 0 && footerCells && footerCells.length > 0) {
+                headerCells.forEach((headerCell, index) => {
+                    if (footerCells[index]) {
+                        const width = headerCell.getBoundingClientRect().width;
+                        (footerCells[index] as HTMLElement).style.width = `${width}px`;
+                        (footerCells[index] as HTMLElement).style.minWidth = `${width}px`;
+                        (footerCells[index] as HTMLElement).style.maxWidth = `${width}px`;
+                    }
+                });
+            }
+        };
+
+        // Initial update
+        setTimeout(updateColumnWidths, 100);
+
+        // Create ResizeObserver to watch for column resizes
+        const resizeObserver = new ResizeObserver(() => {
+            updateColumnWidths();
+        });
+
+        // Observe all header cells
+        const headerCells = document.querySelectorAll('.ms-DetailsHeader-cell');
+        headerCells.forEach(cell => resizeObserver.observe(cell));
+
+        // Cleanup
+        return () => {
+            resizeObserver.disconnect();
+        };
+    }, [columns, gridColumns]);
+
     return (
         <div className="aggregation-footer" ref={footerRef}>
-            <div className="aggregation-footer-inner">
+            <div className="aggregation-footer-row">
                 {columns.map(column => {
                     const aggregation = aggregations[column.name];
                     const gridColumn = gridColumns.find(gc => gc.key === column.name);
-                    const columnWidth = gridColumn?.currentWidth || gridColumn?.minWidth || 150;
+                    const columnWidth = gridColumn?.currentWidth ?? gridColumn?.minWidth ?? 150;
 
                     return (
                         <div
@@ -52,12 +90,9 @@ export const AggregationFooter: React.FC<IAggregationFooterProps> = (props) => {
                             }}
                         >
                             {aggregation ? (
-                                <>
-                                    <span className="aggregation-label">{column.displayName}:</span>
-                                    <span className="aggregation-value">{aggregation.formattedValue}</span>
-                                </>
+                                <span className="aggregation-value">{aggregation.formattedValue}</span>
                             ) : (
-                                <span className="aggregation-label">{column.displayName}: -</span>
+                                <span className="aggregation-empty">-</span>
                             )}
                         </div>
                     );

@@ -90,44 +90,53 @@
     border-top: 2px solid #323130;
     background-color: #faf9f8;
     font-weight: 600;
-    min-height: 42px;
     overflow-x: auto;
     overflow-y: hidden;
+    position: relative;
 }
 
 /* Hide scrollbar for footer to prevent double scrollbars */
 .aggregation-footer::-webkit-scrollbar {
     height: 0px;
+    width: 0px;
 }
 
-.aggregation-footer-inner {
+.aggregation-footer-row {
     display: flex;
-    min-width: max-content;
+    flex-direction: row;
+    min-width: fit-content;
+    width: max-content;
 }
 
 .aggregation-cell {
-    padding: 8px;
+    padding: 12px 4px;
     display: flex;
     align-items: center;
     justify-content: flex-start;
     flex-shrink: 0;
+    flex-grow: 0;
     box-sizing: border-box;
     border-right: 1px solid #edebe9;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    position: relative;
 }
 
 .aggregation-cell:last-child {
     border-right: none;
 }
 
-.aggregation-label {
-    font-size: 12px;
-    color: #605e5c;
-    margin-right: 8px;
-}
-
 .aggregation-value {
     font-size: 14px;
     color: #323130;
+    font-weight: 600;
+}
+
+.aggregation-empty {
+    font-size: 14px;
+    color: #a19f9d;
+    font-weight: 400;
 }
 
 /* Save button styling */
@@ -220,6 +229,26 @@
     cursor: pointer;
 }
 
+/* Read-only cell styling */
+.readonly-cell {
+    background-color: #f3f2f1;
+    cursor: not-allowed;
+    user-select: none;
+}
+
+.readonly-cell:hover {
+    background-color: #edebe9;
+}
+
+.readonly-text {
+    display: inline-block;
+    width: 100%;
+    padding: 6px 8px;
+    color: #605e5c;
+    font-size: 14px;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
 /* Enhanced focus styles for selected/editing cell */
 .editable-cell:focus-within,
 .changed-cell:focus-within {
@@ -253,6 +282,11 @@
     color: #323130;
     padding: 4px 0;
     cursor: pointer;
+    transition: color 0.2s ease;
+}
+
+.column-header-title:hover {
+    color: #0078d4;
 }
 
 .column-filter {
@@ -297,4 +331,45 @@
 
 .ms-DetailsHeader-cellTitle:hover {
     background-color: #edebe9;
+}
+
+/* Tooltip styling */
+.ms-Tooltip,
+.ms-Tooltip *,
+.ms-TooltipHost .ms-Callout,
+.ms-Callout,
+.ms-Callout-main,
+.ms-Layer .ms-Callout-main {
+    background-color: #edebe9 !important;
+    color: #000000 !important;
+}
+
+.ms-Tooltip .ms-Callout-main {
+    max-width: 400px !important;
+    padding: 8px 12px !important;
+    background-color: #edebe9 !important;
+    color: #000000 !important;
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    line-height: 1.4 !important;
+    border-radius: 2px !important;
+    border: 1px solid #8a8886 !important;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15) !important;
+}
+
+.ms-Tooltip .ms-Callout-beak,
+.ms-Callout-beak,
+.ms-Callout-beakCurtain {
+    background-color: #edebe9 !important;
+}
+
+/* Override any theme colors */
+div[class*="ms-Callout"] {
+    background-color: #edebe9 !important;
+    color: #000000 !important;
+}
+
+div[class*="ms-Tooltip"] {
+    background-color: #edebe9 !important;
+    color: #000000 !important;
 }

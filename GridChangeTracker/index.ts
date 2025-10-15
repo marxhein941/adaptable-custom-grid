@@ -55,6 +55,7 @@ export class GridChangeTracker implements ComponentFramework.ReactControl<IInput
             changedCellColor: context.parameters.changedCellColor?.raw || "#FFF4CE",
             aggregationMode: Number(context.parameters.aggregationMode?.raw || 0),
             showChangeIndicator: context.parameters.showChangeIndicator?.raw ?? true,
+            readOnlyFields: context.parameters.readOnlyFields?.raw || "",
             onCellChange: this.handleCellChange.bind(this),
             onSave: this.handleSave.bind(this)
         };
