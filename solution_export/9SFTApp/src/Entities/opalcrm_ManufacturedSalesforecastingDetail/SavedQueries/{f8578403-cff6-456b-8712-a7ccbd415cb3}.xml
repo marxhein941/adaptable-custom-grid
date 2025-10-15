@@ -1,0 +1,55 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<savedqueries xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <savedquery>
+    <IsCustomizable>1</IsCustomizable>
+    <CanBeDeleted>0</CanBeDeleted>
+    <isquickfindquery>0</isquickfindquery>
+    <isprivate>0</isprivate>
+    <isdefault>1</isdefault>
+    <savedqueryid>{f8578403-cff6-456b-8712-a7ccbd415cb3}</savedqueryid>
+    <layoutxml>
+      <grid name="resultset" jump="opalcrm_name" select="1" icon="1" preview="1">
+        <row name="result" id="opalcrm_manufacturedsalesforecastingdetailid">
+          <cell name="opalcrm_month" width="100" />
+          <cell name="opalcrm_lastyearactsqm" width="151" />
+          <cell name="opalcrm_lastyearactratepersqm" width="203" />
+          <cell name="opalcrm_lastyearactgrosssales" width="197" />
+          <cell name="opalcrm_actfcstsqm" width="122" />
+          <cell name="opalcrm_actfcstratepersqm" width="173" />
+          <cell name="opalcrm_actfcstgrosssales" width="171" />
+          <cell name="opalcrm_budgetsqm" width="118" />
+          <cell name="opalcrm_budgetratepersqm" width="170" />
+          <cell name="opalcrm_budgetgrosssales" width="164" />
+          <cell name="opalcrm_actfcst" width="100" />
+        </row>
+      </grid>
+    </layoutxml>
+    <querytype>0</querytype>
+    <fetchxml>
+      <fetch version="1.0" mapping="logical">
+        <entity name="opalcrm_manufacturedsalesforecastingdetail">
+          <attribute name="opalcrm_manufacturedsalesforecastingdetailid" />
+          <filter type="and">
+            <condition attribute="statecode" operator="eq" value="0" />
+          </filter>
+          <attribute name="opalcrm_month" />
+          <attribute name="opalcrm_lastyearactsqm" />
+          <attribute name="opalcrm_lastyearactratepersqm" />
+          <attribute name="opalcrm_lastyearactgrosssales" />
+          <attribute name="opalcrm_actfcstratepersqm" />
+          <attribute name="opalcrm_budgetsqm" />
+          <attribute name="opalcrm_budgetratepersqm" />
+          <attribute name="opalcrm_budgetgrosssales" />
+          <order attribute="opalcrm_month" descending="false" />
+          <attribute name="opalcrm_actfcstsqm" />
+          <attribute name="opalcrm_actfcstgrosssales" />
+          <attribute name="opalcrm_actfcst" />
+        </entity>
+      </fetch>
+    </fetchxml>
+    <IntroducedVersion>1.0</IntroducedVersion>
+    <LocalizedNames>
+      <LocalizedName description="Active Manufactured Salesforecasting Details" languagecode="1033" />
+    </LocalizedNames>
+  </savedquery>
+</savedqueries>

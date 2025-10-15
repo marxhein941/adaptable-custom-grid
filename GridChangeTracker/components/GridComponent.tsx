@@ -31,6 +31,7 @@ interface IGridState {
     sortColumn: string | null;
     isSortDescending: boolean;
     columnFilters: { [key: string]: string };
+    columns: IColumn[];
 }
 
 export class GridComponent extends React.Component<IGridProps, IGridState> {
@@ -51,7 +52,8 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
             aggregations: {},
             sortColumn: null,
             isSortDescending: false,
-            columnFilters: {}
+            columnFilters: {},
+            columns: []
         };
     }
 
@@ -76,6 +78,9 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
             const records = this.loadRecordsFromDataset(this.props.dataset);
             this.changeTracker.initializeData(records);
 
+            // Initialize columns with default widths
+            const initialColumns = this.buildColumns();
+
             this.setState({
                 currentData: records,
                 filteredData: records,
@@ -83,7 +88,8 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
                 errorMessage: null,
                 sortColumn: null,
                 isSortDescending: false,
-                columnFilters: {}
+                columnFilters: {},
+                columns: initialColumns
             }, () => {
                 this.calculateAggregations();
             });
@@ -221,11 +227,15 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
             return [];
         }
 
-        const { sortColumn, isSortDescending, columnFilters } = this.state;
+        const { sortColumn, isSortDescending, columnFilters, columns: stateColumns } = this.state;
 
         return this.props.dataset.columns.map(col => {
             const isSorted = sortColumn === col.name;
             const hasFilter = !!columnFilters[col.name];
+
+            // Preserve existing column width if it exists
+            const existingColumn = stateColumns.find(c => c.key === col.name);
+            const columnWidth = existingColumn?.currentWidth || 150;
 
             return {
                 key: col.name,
@@ -233,6 +243,7 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
                 fieldName: col.name,
                 minWidth: 150,
                 maxWidth: 300,
+                currentWidth: columnWidth,
                 isResizable: true,
                 isSorted: isSorted,
                 isSortedDescending: isSorted ? isSortDescending : undefined,
@@ -243,6 +254,18 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
                 flexGrow: 0
             };
         });
+    }
+
+    private handleColumnResize = (column?: IColumn, newWidth?: number): void => {
+        if (!column || !newWidth) return;
+
+        this.setState(prevState => ({
+            columns: prevState.columns.map(col =>
+                col.key === column.key
+                    ? { ...col, currentWidth: newWidth }
+                    : col
+            )
+        }));
     }
 
     private renderColumnHeader = (columnName: string, hasFilter: boolean): JSX.Element => {
@@ -465,6 +488,7 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
                         layoutMode={DetailsListLayoutMode.fixedColumns}
                         selectionMode={SelectionMode.none}
                         isHeaderVisible={true}
+                        onColumnResize={this.handleColumnResize}
                     />
                 </div>
 
@@ -472,6 +496,7 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
                     aggregations={this.state.aggregations}
                     columns={this.props.dataset.columns}
                     mode={getAggregationMode(this.props.aggregationMode)}
+                    gridColumns={columns}
                 />
             </div>
         );

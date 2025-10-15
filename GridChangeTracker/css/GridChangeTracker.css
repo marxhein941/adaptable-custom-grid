@@ -87,20 +87,36 @@
 
 /* Aggregation footer styling */
 .aggregation-footer {
-    display: flex;
     border-top: 2px solid #323130;
     background-color: #faf9f8;
-    padding: 8px 12px;
     font-weight: 600;
     min-height: 42px;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+/* Hide scrollbar for footer to prevent double scrollbars */
+.aggregation-footer::-webkit-scrollbar {
+    height: 0px;
+}
+
+.aggregation-footer-inner {
+    display: flex;
+    min-width: max-content;
 }
 
 .aggregation-cell {
-    flex: 1;
     padding: 8px;
     display: flex;
     align-items: center;
     justify-content: flex-start;
+    flex-shrink: 0;
+    box-sizing: border-box;
+    border-right: 1px solid #edebe9;
+}
+
+.aggregation-cell:last-child {
+    border-right: none;
 }
 
 .aggregation-label {
