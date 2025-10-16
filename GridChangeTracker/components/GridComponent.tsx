@@ -21,6 +21,7 @@ export interface IGridProps {
     aggregationMode: number;
     showChangeIndicator: boolean;
     readOnlyFields: string;
+    useDescriptionAsColumnName: boolean;
     onCellChange: (recordId: string, columnName: string, value: any) => void;
     onSave: () => Promise<void>;
     // Add context to access WebAPI
@@ -539,9 +540,19 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
             // Use existing width if column was manually resized, otherwise use calculated
             const columnWidth = existingColumn?.currentWidth || calculatedWidth;
 
+            // Determine column display name based on useDescriptionAsColumnName setting
+            let columnDisplayName = col.displayName;
+            if (this.props.useDescriptionAsColumnName) {
+                const description = this.columnDescriptions.get(col.name);
+                // Ensure description is a string before using trim()
+                if (description && typeof description === 'string' && description.trim() !== '') {
+                    columnDisplayName = description;
+                }
+            }
+
             return {
                 key: col.name,
-                name: col.displayName,
+                name: columnDisplayName,
                 fieldName: col.name,
                 minWidth: 10,
                 maxWidth: 100,
@@ -573,29 +584,46 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
     private renderColumnHeader = (columnName: string, hasFilter: boolean): JSX.Element => {
         const filterValue = this.state.columnFilters[columnName] || '';
         const column = this.props.dataset.columns.find(col => col.name === columnName);
-        const displayName = column?.displayName || columnName;
+        const originalDisplayName = column?.displayName || columnName;
 
-        // Get description from our loaded Map first, then try other sources
-        const description = this.columnDescriptions.get(columnName) ||
-                           (column as any)?.description ||
-                           (column as any)?.metadata?.description ||
-                           (column as any)?.tooltip ||
-                           '';
+        // Determine what to show in the header and tooltip
+        let headerText = originalDisplayName;
+        let tooltipText = '';
 
-        const hasDescription = typeof description === 'string' && description.trim().length > 0;
+        if (this.props.useDescriptionAsColumnName) {
+            const description = this.columnDescriptions.get(columnName);
+            // Ensure description is a string before using trim()
+            if (description && typeof description === 'string' && description.trim() !== '') {
+                // Use description as header, original display name as tooltip
+                headerText = description;
+                tooltipText = originalDisplayName;
+            } else {
+                // No description available, just use display name
+                tooltipText = '';
+            }
+        } else {
+            // Original behavior: use display name as header, description as tooltip
+            tooltipText = this.columnDescriptions.get(columnName) ||
+                        (column as any)?.description ||
+                        (column as any)?.metadata?.description ||
+                        (column as any)?.tooltip ||
+                        '';
+        }
+
+        const hasTooltip = typeof tooltipText === 'string' && tooltipText.trim().length > 0;
 
         // Enhanced debug logging
         console.log(`[Tooltip Debug] Column: ${columnName}`);
         console.log(`  - From Map: ${this.columnDescriptions.get(columnName)}`);
-        console.log(`  - Description value: ${description}`);
-        console.log(`  - Has description: ${hasDescription}`);
-        console.log(`  - Type of description: ${typeof description}`);
+        console.log(`  - Header text: ${headerText}`);
+        console.log(`  - Tooltip text: ${tooltipText}`);
+        console.log(`  - Has tooltip: ${hasTooltip}`);
 
         // Header content with optional Info icon
         const headerContent = (
             <React.Fragment>
-                <span className="column-name">{displayName}</span>
-                {hasDescription && (
+                <span className="column-name">{headerText}</span>
+                {hasTooltip && (
                     <Icon
                         iconName="Info"
                         className="column-info-icon"
@@ -615,13 +643,13 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
 
         const titleContent = (
             <div className="column-header-title">
-                {hasDescription ? (
+                {hasTooltip ? (
                     <TooltipHost
                         content={
                             <div style={{ maxWidth: 300 }}>
-                                <strong>{displayName}</strong>
+                                <strong>{headerText}</strong>
                                 <br />
-                                <span style={{ fontSize: '12px' }}>{description}</span>
+                                <span style={{ fontSize: '12px' }}>{tooltipText}</span>
                             </div>
                         }
                         id={`col-tooltip-${columnName}`}
@@ -649,7 +677,7 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
                         placeholder="Filter..."
                         value={filterValue}
                         onChange={(e, newValue) => this.handleFilter(columnName, newValue || '')}
-                        ariaLabel={`Filter ${displayName} column`}
+                        ariaLabel={`Filter ${headerText} column`}
                         styles={{
                             root: { marginTop: 4 },
                             field: { fontSize: 12, padding: '2px 4px' }
@@ -660,7 +688,7 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
                         <Icon
                             iconName="Cancel"
                             onClick={() => this.clearFilter(columnName)}
-                            aria-label={`Clear filter on ${displayName}`}
+                            aria-label={`Clear filter on ${headerText}`}
                             role="button"
                             tabIndex={0}
                             styles={{
