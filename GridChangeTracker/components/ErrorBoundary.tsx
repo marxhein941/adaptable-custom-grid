@@ -22,6 +22,17 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
 
     componentDidCatch(error: Error, errorInfo: React.ErrorInfo): void {
         console.error('[GridChangeTracker] Component error:', error, errorInfo);
+        console.error('[GridChangeTracker] Error stack:', error.stack);
+        console.error('[GridChangeTracker] Component stack:', errorInfo.componentStack);
+
+        // Log additional debug information
+        console.error('[GridChangeTracker] Debug info:', {
+            errorMessage: error.message,
+            errorName: error.name,
+            timestamp: new Date().toISOString(),
+            userAgent: navigator.userAgent,
+            href: window.location.href
+        });
     }
 
     render(): React.ReactNode {

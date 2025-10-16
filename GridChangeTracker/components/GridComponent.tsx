@@ -19,8 +19,11 @@ export interface IGridProps {
     aggregationMode: number;
     showChangeIndicator: boolean;
     readOnlyFields: string;
+    columnDescriptions: string; // JSON string of column descriptions
     onCellChange: (recordId: string, columnName: string, value: any) => void;
     onSave: () => Promise<void>;
+    // Add context to access WebAPI
+    context?: ComponentFramework.Context<any>;
 }
 
 interface IGridState {
@@ -42,6 +45,7 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
     private changeTracker: ChangeTracker;
     private successMessageTimer?: NodeJS.Timeout;
     private debouncedNotifyChange: (recordId: string, columnName: string, value: any) => void;
+    private columnDescriptions = new Map<string, string>();
 
     constructor(props: IGridProps) {
         super(props);
@@ -71,6 +75,7 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
 
     componentDidMount(): void {
         this.loadData();
+        void this.loadColumnDescriptions();
     }
 
     componentWillUnmount(): void {
@@ -132,6 +137,160 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
 
         // Default to editable
         return true;
+    }
+
+    private async loadColumnDescriptions(): Promise<void> {
+        try {
+            // First, try to load descriptions from the configured property
+            if (this.props.columnDescriptions && this.props.columnDescriptions !== "{}") {
+                try {
+                    const configuredDescriptions = JSON.parse(this.props.columnDescriptions);
+                    Object.keys(configuredDescriptions).forEach(columnName => {
+                        const description = configuredDescriptions[columnName];
+                        if (description) {
+                            this.columnDescriptions.set(columnName, description);
+                            console.log(`[GridComponent] Loaded configured description for ${columnName}: ${description}`);
+                        }
+                    });
+
+                    if (this.columnDescriptions.size > 0) {
+                        console.log(`[GridComponent] Loaded ${this.columnDescriptions.size} configured column descriptions`);
+                        this.forceUpdate();
+                        return; // Use configured descriptions if available
+                    }
+                } catch (parseError) {
+                    console.warn('[GridComponent] Failed to parse columnDescriptions JSON:', parseError);
+                }
+            }
+
+            // Get the entity logical name from the dataset
+            const entityType = this.props.dataset.getTargetEntityType();
+
+            if (!entityType) {
+                console.warn('[GridComponent] Unable to load column descriptions: No entity type available');
+                return;
+            }
+
+            console.log(`[GridComponent] Loading column descriptions for entity: ${entityType}`);
+
+            // Approach 1: Use Xrm.Utility.getEntityMetadata (Proper PCF method)
+            // This method handles authentication automatically and is the recommended approach
+            try {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const xrm = (window as any).parent?.Xrm || (window as any).Xrm;
+
+                if (xrm?.Utility?.getEntityMetadata) {
+                    console.log('[GridComponent] Using Xrm.Utility.getEntityMetadata approach');
+
+                    // Get entity metadata with attributes - try without array parameter
+                    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+                    const entityMetadata = await xrm.Utility.getEntityMetadata(entityType);
+
+                    console.log('[GridComponent] Full entity metadata structure:', entityMetadata);
+                    console.log('[GridComponent] Checking for attributes at different paths:');
+                    console.log('  - entityMetadata.Attributes:', entityMetadata?.Attributes);
+                    console.log('  - entityMetadata.attributes:', entityMetadata?.attributes);
+                    console.log('  - entityMetadata.EntityMetadata:', entityMetadata?.EntityMetadata);
+
+                    // Try different possible paths
+                    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+                    const attributes = entityMetadata?.Attributes || entityMetadata?.attributes || entityMetadata?.EntityMetadata?.Attributes;
+
+                    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+                    if (attributes) {
+                        console.log(`[GridComponent] Found ${attributes.length} attributes in metadata`);
+
+                        // Log first attribute to see structure
+                        if (attributes.length > 0) {
+                            console.log('[GridComponent] Sample attribute structure:', attributes[0]);
+                        }
+
+                        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
+                        (attributes as any[]).forEach((attr: any) => {
+                            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+                            const description = attr.Description?.UserLocalizedLabel?.Label;
+                            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+                            const displayName = attr.DisplayName?.UserLocalizedLabel?.Label;
+
+                            // Use description if available, otherwise use display name
+                            const tooltipText = description || displayName;
+
+                            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+                            if (tooltipText && attr.LogicalName) {
+                                // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument
+                                this.columnDescriptions.set(attr.LogicalName, tooltipText);
+                                // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+                                console.log(`[GridComponent] Loaded description for ${attr.LogicalName}: ${tooltipText}`);
+                            }
+                        });
+                        console.log(`[GridComponent] Loaded ${this.columnDescriptions.size} column descriptions via Xrm.Utility.getEntityMetadata`);
+                        this.forceUpdate();
+                        return;
+                    }
+                }
+            } catch (xrmError) {
+                console.log('[GridComponent] Xrm.Utility.getEntityMetadata not available or failed:', xrmError);
+            }
+
+            // Approach 2: Use context.utils.getEntityMetadata if available
+            // Some PCF contexts may have this method
+            try {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const contextUtils = (this.props.context as any)?.utils;
+
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+                if (contextUtils?.getEntityMetadata) {
+                    console.log('[GridComponent] Using context.utils.getEntityMetadata approach');
+
+                    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+                    const entityMetadata = await contextUtils.getEntityMetadata(entityType, ['Attributes']);
+
+                    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+                    if (entityMetadata?.Attributes) {
+                        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
+                        (entityMetadata.Attributes as any[]).forEach((attr: any) => {
+                            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+                            const description = attr.Description?.UserLocalizedLabel?.Label;
+                            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+                            const displayName = attr.DisplayName?.UserLocalizedLabel?.Label;
+
+                            const tooltipText = description || displayName;
+
+                            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+                            if (tooltipText && attr.LogicalName) {
+                                // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument
+                                this.columnDescriptions.set(attr.LogicalName, tooltipText);
+                                // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+                                console.log(`[GridComponent] Loaded description for ${attr.LogicalName}: ${tooltipText}`);
+                            }
+                        });
+                        console.log(`[GridComponent] Loaded ${this.columnDescriptions.size} column descriptions via context.utils.getEntityMetadata`);
+                        this.forceUpdate();
+                        return;
+                    }
+                }
+            } catch (contextMetadataError) {
+                console.log('[GridComponent] context.utils.getEntityMetadata not available or failed:', contextMetadataError);
+            }
+
+            // Approach 3: Fallback - Use column display names as descriptions
+            console.log('[GridComponent] Using fallback approach - display names as descriptions');
+            this.props.dataset.columns.forEach(column => {
+                if (column.displayName && column.displayName !== column.name) {
+                    this.columnDescriptions.set(column.name, `Field: ${column.displayName}`);
+                    console.log(`[GridComponent] Using display name for ${column.name}: ${column.displayName}`);
+                }
+            });
+
+            if (this.columnDescriptions.size > 0) {
+                console.log(`[GridComponent] Loaded ${this.columnDescriptions.size} descriptions from display names`);
+                this.forceUpdate();
+            }
+
+        } catch (error) {
+            console.error('[GridComponent] Failed to load column descriptions:', error);
+            // Non-blocking error - tooltips will fallback to display names
+        }
     }
 
     private loadData = (): void => {
@@ -378,13 +537,19 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
         const column = this.props.dataset.columns.find(col => col.name === columnName);
         const displayName = column?.displayName || columnName;
 
-        // Try multiple sources for description
-        const description = (column as any)?.description ||
+        // Get description from our loaded Map first, then try other sources
+        const description = this.columnDescriptions.get(columnName) ||
+                           (column as any)?.description ||
                            (column as any)?.metadata?.description ||
                            (column as any)?.tooltip ||
                            '';
 
         const hasDescription = typeof description === 'string' && description.trim().length > 0;
+
+        // Debug logging
+        if (this.columnDescriptions.has(columnName)) {
+            console.log(`[Tooltip] Using loaded description for ${columnName}: ${this.columnDescriptions.get(columnName)}`);
+        }
 
         // Header content with optional Info icon
         const headerContent = (

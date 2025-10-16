@@ -5,11 +5,99 @@ Complete guide for deploying the PCF control to Power Platform environments.
 **Publisher:** Adaptable
 **Publisher Prefix:** ada (becomes `ada_` in Dataverse)
 
+---
+
+## 🚀 Quick Start (New Master Script)
+
+**Deploy to DEV:**
+```powershell
+.\deploy.ps1
+```
+
+**Deploy to Pre-Production:**
+```powershell
+.\deploy.ps1 -Environment PP
+```
+
+**Deploy with custom publisher:**
+```powershell
+.\deploy.ps1 -PublisherPrefix "custom"
+```
+
+> **Note:** The new `deploy.ps1` master script replaces all previous deployment scripts (`deploy-dev.ps1`, `deploy-pp.ps1`, `deploy-quick.ps1`, `deploy-fixed.ps1`).
+
+---
+
 ## Prerequisites
 
 - Power Platform CLI installed ([Download](https://aka.ms/PowerAppsCLI))
 - Node.js and npm installed
 - Access to your Dataverse environment with system administrator or customizer role
+
+## Master Deployment Script (`deploy.ps1`)
+
+The new unified deployment script combines all functionality from previous scripts into one powerful tool.
+
+### Features
+
+- ✅ Multi-environment support (DEV, PP)
+- ✅ Configurable publisher prefix
+- ✅ Pre-flight checks (pac CLI, npm)
+- ✅ Environment authentication validation
+- ✅ Build process with timing
+- ✅ Colored output for better readability
+- ✅ Comprehensive error handling with helpful suggestions
+- ✅ Next steps guidance after deployment
+- ✅ Verbose mode for debugging
+- ✅ Skip build option for faster redeployment
+
+### Usage Examples
+
+```powershell
+# Basic deployment to DEV
+.\deploy.ps1
+
+# Deploy to Pre-Production
+.\deploy.ps1 -Environment PP
+
+# Use custom publisher prefix
+.\deploy.ps1 -PublisherPrefix "opal"
+
+# Skip build (use existing build output)
+.\deploy.ps1 -SkipBuild
+
+# Show build timestamp
+.\deploy.ps1 -ShowTimestamp
+
+# Verbose output for debugging
+.\deploy.ps1 -Verbose
+
+# Combine multiple options
+.\deploy.ps1 -Environment PP -PublisherPrefix "opal" -Verbose -ShowTimestamp
+```
+
+### Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `Environment` | String | `DEV` | Target environment (`DEV` or `PP`) |
+| `PublisherPrefix` | String | `ada` | Publisher prefix for the control |
+| `SkipBuild` | Switch | `false` | Skip the build step and use existing build |
+| `ShowTimestamp` | Switch | `false` | Display build timestamp after building |
+| `Verbose` | Switch | `false` | Show detailed output including all logs |
+
+### Migration from Old Scripts
+
+The old deployment scripts have been replaced:
+
+| Old Script | New Command |
+|------------|-------------|
+| `deploy-dev.ps1` | `.\deploy.ps1 -Environment DEV` |
+| `deploy-pp.ps1` | `.\deploy.ps1 -Environment PP` |
+| `deploy-quick.ps1` | Not needed (build is fast and clean) |
+| `deploy-fixed.ps1` | Not needed (build is clean) |
+
+Old scripts have been archived in the `old-deployment-scripts/` folder.
 
 ## Understanding Authentication
 

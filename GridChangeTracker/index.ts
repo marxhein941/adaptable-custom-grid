@@ -27,15 +27,53 @@ export class GridChangeTracker implements ComponentFramework.ReactControl<IInput
         notifyOutputChanged: () => void,
         state: ComponentFramework.Dictionary
     ): void {
-        this.notifyOutputChanged = notifyOutputChanged;
-        this.context = context;
+        try {
+            console.log('[GridChangeTracker] Starting initialization...');
 
-        // Log initialization
-        console.log('GridChangeTracker initialized', {
-            dataset: context.parameters.gridDataset,
-            enableChangeTracking: context.parameters.enableChangeTracking?.raw,
-            aggregationMode: context.parameters.aggregationMode?.raw
-        });
+            this.notifyOutputChanged = notifyOutputChanged;
+            this.context = context;
+
+            // Comprehensive initialization logging
+            console.log('[GridChangeTracker] Init context:', {
+                parameters: {
+                    gridDataset: {
+                        isLoading: context.parameters.gridDataset?.loading,
+                        hasError: context.parameters.gridDataset?.error,
+                        errorMessage: context.parameters.gridDataset?.errorMessage,
+                        recordCount: context.parameters.gridDataset?.sortedRecordIds?.length || 0,
+                        columns: context.parameters.gridDataset?.columns ? Object.keys(context.parameters.gridDataset.columns).length : 0
+                    },
+                    enableChangeTracking: context.parameters.enableChangeTracking?.raw,
+                    aggregationMode: context.parameters.aggregationMode?.raw,
+                    changedCellColor: context.parameters.changedCellColor?.raw,
+                    showChangeIndicator: context.parameters.showChangeIndicator?.raw,
+                    readOnlyFields: context.parameters.readOnlyFields?.raw,
+                    columnDescriptions: context.parameters.columnDescriptions?.raw
+                },
+                mode: context.mode,
+                userSettings: context.userSettings,
+                client: context.client
+            });
+
+            // Check for dataset errors
+            if (context.parameters.gridDataset?.error) {
+                console.error('[GridChangeTracker] Dataset error detected:', context.parameters.gridDataset.errorMessage);
+            }
+
+            console.log('[GridChangeTracker] Initialization completed successfully');
+        } catch (error) {
+            console.error('[GridChangeTracker] CRITICAL: Initialization failed!', error);
+            console.error('[GridChangeTracker] Error details:', {
+                message: error instanceof Error ? error.message : String(error),
+                stack: error instanceof Error ? error.stack : 'No stack trace available',
+                context: {
+                    hasContext: !!context,
+                    hasParameters: !!context?.parameters,
+                    hasDataset: !!context?.parameters?.gridDataset
+                }
+            });
+            throw error; // Re-throw to ensure Power Apps knows initialization failed
+        }
     }
 
     /**
@@ -44,36 +82,97 @@ export class GridChangeTracker implements ComponentFramework.ReactControl<IInput
      * @returns ReactElement root react element for the control
      */
     public updateView(context: ComponentFramework.Context<IInputs>): React.ReactElement {
-        this.context = context;
+        try {
+            console.log('[GridChangeTracker] UpdateView called');
 
-        // Get dataset
-        const dataset = context.parameters.gridDataset;
+            this.context = context;
 
-        // Build props for React component
-        const props: IGridProps = {
-            dataset: dataset,
-            enableChangeTracking: context.parameters.enableChangeTracking?.raw ?? true,
-            changedCellColor: context.parameters.changedCellColor?.raw || "#FFF4CE",
-            aggregationMode: Number(context.parameters.aggregationMode?.raw || 0),
-            showChangeIndicator: context.parameters.showChangeIndicator?.raw ?? true,
-            readOnlyFields: context.parameters.readOnlyFields?.raw || "",
-            onCellChange: this.handleCellChange.bind(this),
-            onSave: this.handleSave.bind(this)
-        };
+            // Get dataset
+            const dataset = context.parameters.gridDataset;
 
-        // Log update
-        console.log('GridChangeTracker updateView', {
-            recordCount: dataset.sortedRecordIds?.length || 0,
-            columns: dataset.columns?.length || 0,
-            hasChanges: this.changedRecords.size > 0
-        });
+            // Comprehensive dataset validation
+            if (!dataset) {
+                console.error('[GridChangeTracker] CRITICAL: Dataset is null or undefined!');
+                return React.createElement(
+                    'div',
+                    { style: { padding: '20px', color: 'red' } },
+                    'Error: Dataset not available. Please check control configuration.'
+                );
+            }
 
-        // Render React component wrapped in ErrorBoundary
-        return React.createElement(
-            ErrorBoundary,
-            null,
-            React.createElement(GridComponent, props)
-        );
+            // Check for dataset errors
+            if (dataset.error) {
+                console.error('[GridChangeTracker] Dataset has error:', dataset.errorMessage);
+                return React.createElement(
+                    'div',
+                    { style: { padding: '20px', color: 'red' } },
+                    `Dataset Error: ${dataset.errorMessage || 'Unknown error occurred'}`
+                );
+            }
+
+            // Build props for React component
+            const props: IGridProps = {
+                dataset: dataset,
+                enableChangeTracking: context.parameters.enableChangeTracking?.raw ?? true,
+                changedCellColor: context.parameters.changedCellColor?.raw || "#FFF4CE",
+                aggregationMode: Number(context.parameters.aggregationMode?.raw || 0),
+                showChangeIndicator: context.parameters.showChangeIndicator?.raw ?? true,
+                readOnlyFields: context.parameters.readOnlyFields?.raw || "",
+                columnDescriptions: context.parameters.columnDescriptions?.raw || "{}",
+                onCellChange: this.handleCellChange.bind(this),
+                onSave: this.handleSave.bind(this),
+                // Pass the full context so GridComponent can access WebAPI
+                context: context
+            };
+
+            // Detailed update logging
+            console.log('[GridChangeTracker] UpdateView context:', {
+                datasetStatus: {
+                    loading: dataset.loading,
+                    error: dataset.error,
+                    errorMessage: dataset.errorMessage,
+                    recordCount: dataset.sortedRecordIds?.length || 0,
+                    columns: dataset.columns ? Object.keys(dataset.columns) : [],
+                    paging: {
+                        pageSize: dataset.paging?.pageSize,
+                        totalResultCount: dataset.paging?.totalResultCount,
+                        hasNextPage: dataset.paging?.hasNextPage,
+                        hasPreviousPage: dataset.paging?.hasPreviousPage
+                    }
+                },
+                props: {
+                    enableChangeTracking: props.enableChangeTracking,
+                    aggregationMode: props.aggregationMode,
+                    showChangeIndicator: props.showChangeIndicator,
+                    changedCellColor: props.changedCellColor
+                },
+                changedRecordsCount: this.changedRecords.size
+            });
+
+            // Render React component wrapped in ErrorBoundary
+            return React.createElement(
+                ErrorBoundary,
+                null,
+                React.createElement(GridComponent, props)
+            );
+        } catch (error) {
+            console.error('[GridChangeTracker] CRITICAL: UpdateView failed!', error);
+            console.error('[GridChangeTracker] UpdateView error details:', {
+                message: error instanceof Error ? error.message : String(error),
+                stack: error instanceof Error ? error.stack : 'No stack trace available'
+            });
+
+            // Return error display
+            return React.createElement(
+                'div',
+                { style: { padding: '20px', color: 'red', fontFamily: 'monospace' } },
+                [
+                    React.createElement('h3', { key: 'title' }, 'GridChangeTracker Error'),
+                    React.createElement('pre', { key: 'error' }, error instanceof Error ? error.message : String(error)),
+                    React.createElement('p', { key: 'instruction' }, 'Check browser console for detailed error information.')
+                ]
+            );
+        }
     }
 
     /**

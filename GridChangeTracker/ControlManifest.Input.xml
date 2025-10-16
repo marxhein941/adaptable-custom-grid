@@ -56,6 +56,14 @@
               required="false"
               default-value=""/>
 
+    <property name="columnDescriptions"
+              display-name-key="Column Descriptions"
+              description-key="JSON object with column descriptions (e.g., {&quot;name&quot;:&quot;Account name&quot;,&quot;revenue&quot;:&quot;Annual revenue&quot;})"
+              of-type="SingleLine.Text"
+              usage="input"
+              required="false"
+              default-value="{}"/>
+
     <resources>
       <code path="index.ts" order="1"/>
       <platform-library name="React" version="16.14.0" />
