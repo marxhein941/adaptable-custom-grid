@@ -48,8 +48,7 @@ export class GridChangeTracker implements ComponentFramework.ReactControl<IInput
                     aggregationMode: context.parameters.aggregationMode?.raw,
                     changedCellColor: context.parameters.changedCellColor?.raw,
                     showChangeIndicator: context.parameters.showChangeIndicator?.raw,
-                    readOnlyFields: context.parameters.readOnlyFields?.raw,
-                    columnDescriptions: context.parameters.columnDescriptions?.raw
+                    readOnlyFields: context.parameters.readOnlyFields?.raw
                 },
                 mode: context.mode,
                 userSettings: context.userSettings,
@@ -119,7 +118,6 @@ export class GridChangeTracker implements ComponentFramework.ReactControl<IInput
                 aggregationMode: Number(context.parameters.aggregationMode?.raw || 0),
                 showChangeIndicator: context.parameters.showChangeIndicator?.raw ?? true,
                 readOnlyFields: context.parameters.readOnlyFields?.raw || "",
-                columnDescriptions: context.parameters.columnDescriptions?.raw || "{}",
                 onCellChange: this.handleCellChange.bind(this),
                 onSave: this.handleSave.bind(this),
                 // Pass the full context so GridComponent can access WebAPI

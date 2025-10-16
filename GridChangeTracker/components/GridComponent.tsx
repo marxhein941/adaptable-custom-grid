@@ -21,7 +21,6 @@ export interface IGridProps {
     aggregationMode: number;
     showChangeIndicator: boolean;
     readOnlyFields: string;
-    columnDescriptions: string; // JSON string of column descriptions
     onCellChange: (recordId: string, columnName: string, value: any) => void;
     onSave: () => Promise<void>;
     // Add context to access WebAPI
@@ -307,46 +306,6 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
 
     private loadConfiguredDescriptions(): void {
         try {
-            // First, try to load from configured property
-            if (this.props.columnDescriptions && this.props.columnDescriptions !== "{}") {
-                try {
-                    const configuredDescriptions = JSON.parse(this.props.columnDescriptions);
-
-                    // Process each configured description
-                    Object.keys(configuredDescriptions).forEach(configKey => {
-                        const description = configuredDescriptions[configKey];
-                        if (description) {
-                            // Store with the exact key from config
-                            this.columnDescriptions.set(configKey, description);
-                            console.log(`[GridComponent] Loaded configured description for ${configKey}: ${description}`);
-
-                            // Also check if this is a simplified name that matches a prefixed column
-                            const columns = this.props.dataset.columns;
-                            const matchingColumn = columns.find(col => {
-                                // Check exact match first
-                                if (col.name === configKey) return true;
-                                // Check if the column ends with the config key
-                                const simplifiedName = col.name.split('_').pop();
-                                return simplifiedName === configKey;
-                            });
-
-                            if (matchingColumn && matchingColumn.name !== configKey) {
-                                this.columnDescriptions.set(matchingColumn.name, description);
-                                console.log(`[GridComponent] Also mapped description to full column name ${matchingColumn.name}`);
-                            }
-                        }
-                    });
-
-                    if (this.columnDescriptions.size > 0) {
-                        console.log(`[GridComponent] Loaded ${this.columnDescriptions.size} configured column descriptions`);
-                        this.forceUpdate();
-                        return;
-                    }
-                } catch (parseError) {
-                    console.warn('[GridComponent] Failed to parse columnDescriptions JSON:', parseError);
-                }
-            }
-
             // Load metadata from imported configuration (fallback to static config if available)
             const importedDescriptions = getColumnDescriptions();
             if (importedDescriptions.size > 0) {

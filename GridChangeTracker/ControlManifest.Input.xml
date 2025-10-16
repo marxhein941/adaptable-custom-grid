@@ -34,10 +34,6 @@
               default-value="0">
       <value name="None" display-name-key="None">0</value>
       <value name="Sum" display-name-key="Sum (Total)">1</value>
-      <value name="Average" display-name-key="Average">2</value>
-      <value name="Count" display-name-key="Count">3</value>
-      <value name="Min" display-name-key="Minimum">4</value>
-      <value name="Max" display-name-key="Maximum">5</value>
     </property>
 
     <property name="showChangeIndicator"
@@ -52,14 +48,6 @@
               display-name-key="Read-Only Fields"
               description-key="Comma-separated list of field names that should be read-only (e.g., fieldname1,fieldname2)"
               of-type="SingleLine.Text"
-              usage="input"
-              required="false"
-              default-value=""/>
-
-    <property name="columnDescriptions"
-              display-name-key="Column Descriptions (Optional)"
-              description-key="Optional JSON object to override automatic column descriptions. Leave empty to use metadata from Dataverse. Example: {&quot;name&quot;:&quot;Account name&quot;,&quot;revenue&quot;:&quot;Annual revenue&quot;}"
-              of-type="Multiple"
               usage="input"
               required="false"
               default-value=""/>
