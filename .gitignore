@@ -24,3 +24,5 @@
 
 # auto-generated build constants
 GridChangeTracker/buildConstants.ts
+
+json-extract-metadata*

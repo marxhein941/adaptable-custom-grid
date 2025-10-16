@@ -2,6 +2,7 @@ import { IInputs, IOutputs } from "./generated/ManifestTypes";
 import { GridComponent, IGridProps } from "./components/GridComponent";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import * as React from "react";
+import { convertValueByDataType, getColumnMetadata } from "./utils/typeConverter";
 
 export class GridChangeTracker implements ComponentFramework.ReactControl<IInputs, IOutputs> {
     private notifyOutputChanged: () => void;
@@ -180,6 +181,22 @@ export class GridChangeTracker implements ComponentFramework.ReactControl<IInput
      */
     private handleCellChange(recordId: string, columnName: string, newValue: any): void {
         try {
+            // Get column metadata to ensure proper data type conversion
+            const dataset = this.context.parameters.gridDataset;
+            const columnMetadata = getColumnMetadata(dataset, columnName);
+            const dataType = columnMetadata?.dataType;
+
+            // Convert the value based on the column's actual data type
+            const processedValue = convertValueByDataType(newValue, dataType, columnName);
+
+            console.log(`[Index] Processing cell change for ${columnName}:`, {
+                originalValue: newValue,
+                originalType: typeof newValue,
+                processedValue,
+                processedType: typeof processedValue,
+                columnDataType: dataType
+            });
+
             // Track the change
             if (!this.changedRecords.has(recordId)) {
                 this.changedRecords.set(recordId, {});
@@ -187,10 +204,8 @@ export class GridChangeTracker implements ComponentFramework.ReactControl<IInput
 
             const recordChanges = this.changedRecords.get(recordId);
             if (recordChanges) {
-                recordChanges[columnName] = newValue;
+                recordChanges[columnName] = processedValue;
             }
-
-            console.log('Cell changed', { recordId, columnName, newValue });
 
             // Notify framework
             this.notifyOutputChanged();

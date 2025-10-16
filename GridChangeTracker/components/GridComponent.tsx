@@ -11,6 +11,8 @@ import { calculateAggregations, AggregationMode, getAggregationMode, Aggregation
 import { AggregationFooter } from './AggregationFooter';
 import { BUILD_TIMESTAMP } from '../buildConstants';
 import { debounce } from '../utils/debounce';
+import { getColumnDescriptions, defaultColumnDescriptions } from '../utils/metadataConfig';
+import { convertValueByDataType, getColumnMetadata } from '../utils/typeConverter';
 
 export interface IGridProps {
     dataset: ComponentFramework.PropertyTypes.DataSet;
@@ -145,11 +147,31 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
             if (this.props.columnDescriptions && this.props.columnDescriptions !== "{}") {
                 try {
                     const configuredDescriptions = JSON.parse(this.props.columnDescriptions);
-                    Object.keys(configuredDescriptions).forEach(columnName => {
-                        const description = configuredDescriptions[columnName];
+
+                    // Process each configured description
+                    Object.keys(configuredDescriptions).forEach(configKey => {
+                        const description = configuredDescriptions[configKey];
                         if (description) {
-                            this.columnDescriptions.set(columnName, description);
-                            console.log(`[GridComponent] Loaded configured description for ${columnName}: ${description}`);
+                            // Store with the exact key from config
+                            this.columnDescriptions.set(configKey, description);
+                            console.log(`[GridComponent] Loaded configured description for ${configKey}: ${description}`);
+
+                            // Also check if this is a simplified name that matches a prefixed column
+                            // For example: "year" might match "opalcrm_year"
+                            const columns = this.props.dataset.columns;
+                            const matchingColumn = columns.find(col => {
+                                // Check exact match first
+                                if (col.name === configKey) return true;
+
+                                // Check if the column ends with the config key (e.g., "opalcrm_year" ends with "year")
+                                const simplifiedName = col.name.split('_').pop(); // Get the part after the last underscore
+                                return simplifiedName === configKey;
+                            });
+
+                            if (matchingColumn && matchingColumn.name !== configKey) {
+                                this.columnDescriptions.set(matchingColumn.name, description);
+                                console.log(`[GridComponent] Also mapped description to full column name ${matchingColumn.name}`);
+                            }
                         }
                     });
 
@@ -162,6 +184,25 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
                     console.warn('[GridComponent] Failed to parse columnDescriptions JSON:', parseError);
                 }
             }
+
+            // Load metadata from imported configuration
+            const importedDescriptions = getColumnDescriptions();
+            if (importedDescriptions.size > 0) {
+                importedDescriptions.forEach((description, columnName) => {
+                    this.columnDescriptions.set(columnName, description);
+                    console.log(`[GridComponent] Loaded metadata description for ${columnName}: ${description}`);
+                });
+                console.log(`[GridComponent] Loaded ${importedDescriptions.size} column descriptions from metadata config`);
+            }
+
+            // Also add default system field descriptions
+            Object.entries(defaultColumnDescriptions).forEach(([columnName, description]) => {
+                if (!this.columnDescriptions.has(columnName)) {
+                    this.columnDescriptions.set(columnName, description);
+                }
+            });
+
+            console.log(`[GridComponent] Total column descriptions loaded: ${this.columnDescriptions.size}`);
 
             // Get the entity logical name from the dataset
             const entityType = this.props.dataset.getTargetEntityType();
@@ -546,10 +587,12 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
 
         const hasDescription = typeof description === 'string' && description.trim().length > 0;
 
-        // Debug logging
-        if (this.columnDescriptions.has(columnName)) {
-            console.log(`[Tooltip] Using loaded description for ${columnName}: ${this.columnDescriptions.get(columnName)}`);
-        }
+        // Enhanced debug logging
+        console.log(`[Tooltip Debug] Column: ${columnName}`);
+        console.log(`  - From Map: ${this.columnDescriptions.get(columnName)}`);
+        console.log(`  - Description value: ${description}`);
+        console.log(`  - Has description: ${hasDescription}`);
+        console.log(`  - Type of description: ${typeof description}`);
 
         // Header content with optional Info icon
         const headerContent = (
@@ -688,25 +731,40 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
     }
 
     private handleCellChange = (recordId: string, columnName: string, newValue: any): void => {
+        // Get column metadata to determine the proper data type
+        const columnMetadata = getColumnMetadata(this.props.dataset, columnName);
+        const dataType = columnMetadata?.dataType;
+
+        // Convert the value based on the column's actual data type
+        const processedValue = convertValueByDataType(newValue, dataType, columnName);
+
+        console.log(`[GridComponent] Cell change for ${columnName}:`, {
+            originalValue: newValue,
+            originalType: typeof newValue,
+            processedValue,
+            processedType: typeof processedValue,
+            columnDataType: dataType
+        });
+
         // Update current data
         const updatedCurrentData = this.state.currentData.map(record =>
             record.id === recordId
-                ? { ...record, [columnName]: newValue }
+                ? { ...record, [columnName]: processedValue }
                 : record
         );
 
         // Update filtered data
         const updatedFilteredData = this.state.filteredData.map(record =>
             record.id === recordId
-                ? { ...record, [columnName]: newValue }
+                ? { ...record, [columnName]: processedValue }
                 : record
         );
 
-        // Track the change
-        this.changeTracker.trackChange(recordId, columnName, newValue);
+        // Track the change with the processed value
+        this.changeTracker.trackChange(recordId, columnName, processedValue);
 
-        // Notify parent component with debouncing to reduce rapid updates
-        this.debouncedNotifyChange(recordId, columnName, newValue);
+        // Notify parent component with the processed value
+        this.debouncedNotifyChange(recordId, columnName, processedValue);
 
         this.setState({
             currentData: updatedCurrentData,
