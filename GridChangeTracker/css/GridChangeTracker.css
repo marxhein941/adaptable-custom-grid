@@ -164,10 +164,53 @@
     max-height: calc(546px - 84px); /* Total height minus header and filter row height */
 }
 
+/* Custom data rows */
+.custom-data-rows {
+    min-width: fit-content;
+    width: max-content;
+}
+
+.custom-data-row {
+    display: flex;
+    flex-direction: row;
+    min-width: fit-content;
+    width: max-content;
+    border-bottom: 1px solid #edebe9;
+}
+
+.custom-data-row:hover {
+    background-color: #f3f2f1;
+}
+
+.custom-data-cell {
+    display: flex;
+    align-items: stretch;
+    flex-shrink: 0;
+    flex-grow: 0;
+    box-sizing: border-box;
+    border-right: 1px solid #edebe9;
+}
+
+.custom-data-cell:last-child {
+    border-right: none;
+}
+
 /* Ensure DetailsList respects horizontal scrolling */
 .grid-content .ms-DetailsList {
     min-width: 100%;
     width: max-content;
+}
+
+/* Remove DetailsList's default cell padding to match our custom header */
+.grid-content .ms-DetailsRow-cell {
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+/* Ensure DetailsList cells have exact width matching headers */
+.grid-content .ms-DetailsRow-cell > div {
+    width: 100% !important;
+    height: 100% !important;
 }
 
 /* Smooth scrollbar styling */

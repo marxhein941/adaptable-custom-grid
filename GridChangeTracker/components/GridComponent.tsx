@@ -739,6 +739,9 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
 
         const { sortColumn, isSortDescending, columnFilters, columns: stateColumns, filteredData } = this.state;
 
+        // Fixed width for all columns - no dynamic sizing
+        const FIXED_COLUMN_WIDTH = 200;
+
         return this.props.dataset.columns.map(col => {
             const isSorted = sortColumn === col.name;
             const hasFilter = !!columnFilters[col.name];
@@ -754,15 +757,8 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
             // Preserve existing column width if it exists (user has manually resized)
             const existingColumn = stateColumns.find(c => c.key === col.name);
 
-            // Calculate optimal width based on header and content
-            const calculatedWidth = this.calculateOptimalColumnWidth(
-                col.name,
-                col.displayName,
-                filteredData
-            );
-
-            // Use existing width if column was manually resized, otherwise use calculated
-            const columnWidth = existingColumn?.currentWidth || calculatedWidth;
+            // Use existing width if column was manually resized, otherwise use fixed width
+            const columnWidth = existingColumn?.currentWidth || FIXED_COLUMN_WIDTH;
 
             // Determine column display name based on useDescriptionAsColumnName setting
             let columnDisplayName = col.displayName;
@@ -778,8 +774,8 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
                 key: col.name,
                 name: columnDisplayName,
                 fieldName: col.name,
-                minWidth: 100,
-                maxWidth: 300,
+                minWidth: FIXED_COLUMN_WIDTH,
+                maxWidth: FIXED_COLUMN_WIDTH,
                 currentWidth: columnWidth,
                 isResizable: true,
                 isSorted: isSorted,
@@ -814,21 +810,25 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
                         const originalDisplayName = column?.displayName || columnName;
 
                         // Determine what to show in the header and tooltip
+                        // Rule: Show the inverse of what's in the header
                         let headerText = originalDisplayName;
                         let tooltipText = '';
 
+                        const description = this.columnDescriptions.get(columnName);
+                        const hasDescription = description && typeof description === 'string' && description.trim() !== '';
+
                         if (this.props.useDescriptionAsColumnName) {
-                            const description = this.columnDescriptions.get(columnName);
-                            if (description && typeof description === 'string' && description.trim() !== '') {
+                            // Header shows Description, Tooltip shows Column Name
+                            if (hasDescription) {
                                 headerText = description;
-                                tooltipText = originalDisplayName;
+                                tooltipText = originalDisplayName; // Show column name in tooltip
                             }
                         } else {
-                            tooltipText = this.columnDescriptions.get(columnName) ||
-                                        (column as any)?.description ||
-                                        (column as any)?.metadata?.description ||
-                                        (column as any)?.tooltip ||
-                                        '';
+                            // Header shows Column Name, Tooltip shows Description
+                            if (hasDescription) {
+                                headerText = originalDisplayName;
+                                tooltipText = description; // Show description in tooltip
+                            }
                         }
 
                         const hasTooltip = typeof tooltipText === 'string' && tooltipText.trim().length > 0;
@@ -867,13 +867,7 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
                             >
                                 {hasTooltip ? (
                                     <TooltipHost
-                                        content={
-                                            <div style={{ maxWidth: 300 }}>
-                                                <strong>{headerText}</strong>
-                                                <br />
-                                                <span style={{ fontSize: '12px' }}>{tooltipText}</span>
-                                            </div>
-                                        }
+                                        content={tooltipText}
                                         id={`col-tooltip-${columnName}`}
                                         calloutProps={{
                                             gapSpace: 0,
@@ -955,6 +949,35 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
         );
     }
 
+    private renderCustomRows = (): JSX.Element => {
+        const { filteredData, columns } = this.state;
+
+        return (
+            <div className="custom-data-rows">
+                {filteredData.map((item, rowIndex) => (
+                    <div key={item.id || rowIndex} className="custom-data-row">
+                        {columns.map(col => {
+                            const columnName = col.key;
+                            return (
+                                <div
+                                    key={`${item.id}-${columnName}`}
+                                    className="custom-data-cell"
+                                    style={{
+                                        width: col.currentWidth || col.minWidth,
+                                        minWidth: col.minWidth,
+                                        maxWidth: col.maxWidth
+                                    }}
+                                >
+                                    {this.renderCell(item, columnName)}
+                                </div>
+                            );
+                        })}
+                    </div>
+                ))}
+            </div>
+        );
+    }
+
     private renderCell = (item: any, columnName: string): JSX.Element => {
         const isChanged = this.changeTracker.isCellChanged(item.id, columnName);
         const value = item[columnName] || '';
@@ -985,10 +1008,15 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
             backgroundColor: isChanged && this.props.enableChangeTracking
                 ? this.props.changedCellColor
                 : isEditable ? 'transparent' : '#f3f2f1',
-            padding: '2px 4px',
+            padding: '8px 12px',
             transition: 'all 0.2s ease-in-out',
             cursor: isEditable ? 'text' : 'not-allowed',
-            opacity: isEditable ? 1 : 0.7
+            opacity: isEditable ? 1 : 0.7,
+            width: '100%',
+            height: '100%',
+            boxSizing: 'border-box',
+            display: 'flex',
+            alignItems: 'center'
         };
 
         const cellClassName = isEditable
@@ -1208,16 +1236,9 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
                     {/* Custom sticky header with filters */}
                     {this.renderCustomHeader()}
 
-                    {/* Data rows only - header is hidden */}
+                    {/* Custom data rows - no DetailsList */}
                     <div className="grid-body" ref={this.bodyRef}>
-                        <DetailsList
-                            items={filteredData}
-                            columns={columns}
-                            layoutMode={DetailsListLayoutMode.fixedColumns}
-                            selectionMode={SelectionMode.none}
-                            isHeaderVisible={false}
-                            onColumnResize={this.handleColumnResize}
-                        />
+                        {this.renderCustomRows()}
                     </div>
                 </div>
 
