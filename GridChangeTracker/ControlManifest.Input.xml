@@ -31,9 +31,9 @@
               of-type="Enum"
               usage="input"
               required="false"
-              default-value="0">
-      <value name="None" display-name-key="None">0</value>
+              default-value="1">
       <value name="Sum" display-name-key="Sum (Total)">1</value>
+      <value name="None" display-name-key="None">0</value>
     </property>
 
     <property name="showChangeIndicator"
@@ -59,6 +59,22 @@
               usage="input"
               required="false"
               default-value="false"/>
+
+    <property name="filterField"
+              display-name-key="Filter Field"
+              description-key="Logical name of field to filter by (e.g., ownerid, _ownerid_value). Leave empty for no filtering."
+              of-type="SingleLine.Text"
+              usage="input"
+              required="false"
+              default-value="ownerid"/>
+
+    <property name="filterValue"
+              display-name-key="Filter Value"
+              description-key="Value to filter by. Use {CurrentUser} for current user ID, or leave empty for no filtering."
+              of-type="SingleLine.Text"
+              usage="input"
+              required="false"
+              default-value="{CurrentUser}"/>
 
     <resources>
       <code path="index.ts" order="1"/>

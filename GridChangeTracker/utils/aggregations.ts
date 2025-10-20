@@ -71,7 +71,14 @@ function extractNumericValues(data: any[], columnName: string): number[] {
     const values: number[] = [];
 
     data.forEach(record => {
-        const value = record[columnName];
+        // First try to get the raw value (stored as columnName_raw)
+        // This avoids issues with formatted values like "$1,234.56" or "1,234"
+        let value = record[`${columnName}_raw`];
+
+        // Fallback to the display value if raw value doesn't exist
+        if (value == null) {
+            value = record[columnName];
+        }
 
         if (value != null) {
             // Try to convert to number
@@ -188,7 +195,13 @@ export function isNumericColumn(data: any[], columnName: string): boolean {
     let numericCount = 0;
 
     for (let i = 0; i < data.length && numericCount < sampleSize; i++) {
-        const value = data[i][columnName];
+        // First try to get the raw value (stored as columnName_raw)
+        let value = data[i][`${columnName}_raw`];
+
+        // Fallback to the display value if raw value doesn't exist
+        if (value == null) {
+            value = data[i][columnName];
+        }
 
         if (value != null) {
             const numValue = typeof value === 'number' ? value : parseFloat(value);

@@ -22,6 +22,8 @@ export interface IGridProps {
     showChangeIndicator: boolean;
     readOnlyFields: string;
     useDescriptionAsColumnName: boolean;
+    filterField: string;
+    filterValue: string;
     onCellChange: (recordId: string, columnName: string, value: any) => void;
     onSave: () => Promise<void>;
     // Add context to access WebAPI
@@ -80,6 +82,9 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
     }
 
     componentDidMount(): void {
+        // Apply filter if specified
+        this.applyFilter();
+
         // Set page size to maximum to load all records at once
         const needsRefresh = this.setMaxPageSize();
 
@@ -94,6 +99,45 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
 
         // Setup scroll synchronization between header and body
         this.setupScrollSync();
+    }
+
+    private applyFilter = (): void => {
+        const { filterField, filterValue, dataset } = this.props;
+
+        // Skip if no filter is configured
+        if (!filterField || !filterValue || filterField.trim() === '' || filterValue.trim() === '') {
+            console.log('[GridComponent] No filter configured, skipping filtering');
+            return;
+        }
+
+        try {
+            console.log('[GridComponent] Applying filter:', { filterField, filterValue });
+
+            // Use dataset filtering API
+            const filterExpression = {
+                conditions: [
+                    {
+                        attributeName: filterField,
+                        conditionOperator: 0, // Equal (ConditionOperator.Equal)
+                        value: filterValue
+                    }
+                ],
+                filterOperator: 0 // And (LogicalOperator.And)
+            };
+
+            console.log('[GridComponent] Filter expression:', JSON.stringify(filterExpression, null, 2));
+
+            // Apply the filter using the dataset filtering API
+            if (dataset.filtering) {
+                dataset.filtering.clearFilter();
+                dataset.filtering.setFilter(filterExpression as any);
+                console.log('[GridComponent] Filter applied successfully');
+            } else {
+                console.warn('[GridComponent] Dataset filtering API not available');
+            }
+        } catch (error) {
+            console.error('[GridComponent] Error applying filter:', error);
+        }
     }
 
     private setupScrollSync = (): void => {
@@ -172,6 +216,12 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
     }
 
     componentDidUpdate(prevProps: IGridProps): void {
+        // Reapply filter if filter configuration changes
+        if (prevProps.filterField !== this.props.filterField || prevProps.filterValue !== this.props.filterValue) {
+            console.log('[GridComponent] Filter configuration changed, reapplying filter');
+            this.applyFilter();
+        }
+
         // Reload data if dataset changes
         if (prevProps.dataset !== this.props.dataset) {
             // Ensure max page size is set for new dataset
@@ -740,7 +790,7 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
         const { sortColumn, isSortDescending, columnFilters, columns: stateColumns, filteredData } = this.state;
 
         // Fixed width for all columns - no dynamic sizing
-        const FIXED_COLUMN_WIDTH = 200;
+        const FIXED_COLUMN_WIDTH = 150;
 
         return this.props.dataset.columns.map(col => {
             const isSorted = sortColumn === col.name;
