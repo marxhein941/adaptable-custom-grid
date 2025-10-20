@@ -68,6 +68,21 @@ export function isStringType(dataType: string | undefined): boolean {
 }
 
 /**
+ * Check if a column is editable based on its data type
+ */
+export function isFieldEditableByType(dataType: string | undefined): boolean {
+    if (!dataType) return true; // Default to editable if unknown
+
+    // Fields that should NOT be edited directly in grid
+    const nonEditableTypes = [
+        ColumnDataType.Lookup,  // Lookup fields require entity reference
+        ColumnDataType.Guid     // GUIDs are usually system fields
+    ];
+
+    return !nonEditableTypes.includes(dataType as ColumnDataType);
+}
+
+/**
  * Convert a value to the appropriate type based on column data type
  */
 export function convertValueByDataType(
@@ -167,18 +182,74 @@ export function convertValueByDataType(
         return !!value;
     }
 
+    // Handle Lookup fields - these should NOT be edited directly
+    if (dataType === ColumnDataType.Lookup) {
+        console.warn(`[TypeConverter] Lookup field '${columnName}' cannot be edited directly in grid. Returning null to prevent updates.`);
+        // Return undefined to signal that this field should not be updated
+        return undefined;
+    }
+
+    // Handle OptionSet fields - need special handling
+    if (dataType === ColumnDataType.OptionSet) {
+        // If it's a number, return as-is (option value)
+        if (typeof value === 'number') {
+            return value;
+        }
+        // Try to convert string to number
+        if (typeof value === 'string') {
+            const numValue = parseInt(value, 10);
+            if (!isNaN(numValue)) {
+                return numValue;
+            }
+        }
+        console.warn(`[TypeConverter] Unable to convert OptionSet value for '${columnName}', returning null`);
+        return null;
+    }
+
+    // Handle Date fields
+    if (dataType === ColumnDataType.DateAndTime || dataType === ColumnDataType.DateOnly) {
+        // If already a Date object or ISO string, return as-is
+        if (value instanceof Date) {
+            return value.toISOString();
+        }
+        if (typeof value === 'string') {
+            // Try to parse the date
+            const dateValue = new Date(value);
+            if (!isNaN(dateValue.getTime())) {
+                return dateValue.toISOString();
+            }
+        }
+        console.warn(`[TypeConverter] Unable to convert date value for '${columnName}', returning null`);
+        return null;
+    }
+
     // For all other types, return as-is
-    console.log(`[TypeConverter] Unknown dataType '${dataType}', returning value as-is`);
+    console.log(`[TypeConverter] Unknown dataType '${dataType}' for column '${columnName}', returning value as-is`);
     return value;
 }
 
 /**
- * Get column metadata including data type
+ * Extended column metadata interface
+ * Based on actual PCF dataset column metadata structure
+ */
+export interface ExtendedColumnMetadata {
+    dataType?: string;
+    displayName?: string;
+    isValidForUpdate?: boolean;
+    isValidForCreate?: boolean;
+    attributeType?: string;
+    isVirtualField?: boolean; // AttributeType === "Virtual"
+    isNameField?: boolean; // Logical name fields (e.g., "createdbyname")
+}
+
+/**
+ * Get column metadata including data type and editability information
+ * Note: Based on actual Dataverse Web API metadata structure
  */
 export function getColumnMetadata(
     dataset: ComponentFramework.PropertyTypes.DataSet,
     columnName: string
-): { dataType?: string; displayName?: string } | null {
+): ExtendedColumnMetadata | null {
     const column = dataset.columns.find(col => col.name === columnName);
 
     if (!column) {
@@ -190,8 +261,39 @@ export function getColumnMetadata(
     // Note: The actual property name might vary depending on PCF version
     const metadata = column as unknown as Record<string, unknown>;
 
-    return {
-        dataType: (metadata.dataType as string) || (metadata.type as string) || undefined,
-        displayName: (metadata.displayName as string) || column.name
+    // Determine attribute type
+    const attributeType = (metadata.attributeType as string) || (metadata.type as string) || undefined;
+
+    // Check if this is a virtual/computed field (AttributeType === "Virtual")
+    const isVirtualField = attributeType === 'Virtual';
+
+    // Check if this is a "name" field (logical representation of lookups/owners)
+    // These fields end with "name" or "yominame" and are typically not updateable
+    const isNameField = columnName.endsWith('name') || columnName.endsWith('yominame');
+
+    const extendedMetadata: ExtendedColumnMetadata = {
+        dataType: (metadata.dataType as string) || attributeType,
+        displayName: (metadata.displayName as string) || column.name,
+        // Check if field can be updated (comes from Dataverse metadata)
+        // If not explicitly set, default based on heuristics
+        isValidForUpdate: metadata.isValidForUpdate !== undefined
+            ? (metadata.isValidForUpdate as boolean)
+            : !isVirtualField && !isNameField, // Virtual and name fields default to not updateable
+        isValidForCreate: metadata.isValidForCreate as boolean | undefined,
+        attributeType: attributeType,
+        isVirtualField: isVirtualField,
+        isNameField: isNameField
     };
+
+    // Log metadata for debugging (only in development)
+    console.log(`[TypeConverter] Metadata for '${columnName}':`, {
+        dataType: extendedMetadata.dataType,
+        attributeType: extendedMetadata.attributeType,
+        isValidForUpdate: extendedMetadata.isValidForUpdate,
+        isVirtualField: extendedMetadata.isVirtualField,
+        isNameField: extendedMetadata.isNameField,
+        isPrimary: column.isPrimary
+    });
+
+    return extendedMetadata;
 }

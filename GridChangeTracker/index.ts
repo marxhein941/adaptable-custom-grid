@@ -189,6 +189,12 @@ export class GridChangeTracker implements ComponentFramework.ReactControl<IInput
             // Convert the value based on the column's actual data type
             const processedValue = convertValueByDataType(newValue, dataType, columnName);
 
+            // If processedValue is undefined, it means this field should not be updated (e.g., lookup fields)
+            if (processedValue === undefined) {
+                console.warn(`[Index] Field ${columnName} cannot be updated directly. Skipping.`);
+                return;
+            }
+
             console.log(`[Index] Processing cell change for ${columnName}:`, {
                 originalValue: newValue,
                 originalType: typeof newValue,

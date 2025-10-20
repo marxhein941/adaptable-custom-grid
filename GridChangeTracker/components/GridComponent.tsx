@@ -12,7 +12,7 @@ import { AggregationFooter } from './AggregationFooter';
 import { BUILD_TIMESTAMP } from '../buildConstants';
 import { debounce } from '../utils/debounce';
 import { getColumnDescriptions, defaultColumnDescriptions } from '../utils/metadataConfig';
-import { convertValueByDataType, getColumnMetadata } from '../utils/typeConverter';
+import { convertValueByDataType, getColumnMetadata, isFieldEditableByType } from '../utils/typeConverter';
 
 export interface IGridProps {
     dataset: ComponentFramework.PropertyTypes.DataSet;
@@ -48,6 +48,10 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
     private successMessageTimer?: NodeJS.Timeout;
     private debouncedNotifyChange: (recordId: string, columnName: string, value: any) => void;
     private columnDescriptions = new Map<string, string>();
+    private entityMetadata = new Map<string, { isValidForUpdate: boolean; attributeType: string }>();
+    private pageSizeSet = false; // Flag to track if we've set the max page size
+    private headerRef = React.createRef<HTMLDivElement>();
+    private bodyRef = React.createRef<HTMLDivElement>();
 
     constructor(props: IGridProps) {
         super(props);
@@ -76,8 +80,84 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
     }
 
     componentDidMount(): void {
-        this.loadData();
+        // Set page size to maximum to load all records at once
+        const needsRefresh = this.setMaxPageSize();
+
+        // Only load data if we didn't trigger a refresh
+        // (refresh will trigger updateView which will call loadData)
+        if (!needsRefresh) {
+            this.loadData();
+        }
+
         void this.loadColumnDescriptions();
+        void this.loadEntityMetadata();
+
+        // Setup scroll synchronization between header and body
+        this.setupScrollSync();
+    }
+
+    private setupScrollSync = (): void => {
+        if (this.bodyRef.current) {
+            // Remove existing listener first to prevent duplicates
+            this.bodyRef.current.removeEventListener('scroll', this.handleBodyScroll);
+            // Add listener
+            this.bodyRef.current.addEventListener('scroll', this.handleBodyScroll);
+        }
+    }
+
+    private handleBodyScroll = (): void => {
+        if (this.bodyRef.current && this.headerRef.current) {
+            // Sync horizontal scroll position from body to header
+            this.headerRef.current.scrollLeft = this.bodyRef.current.scrollLeft;
+        }
+    }
+
+    private setMaxPageSize(): boolean {
+        const dataset = this.props.dataset;
+
+        console.log('[GridComponent] setMaxPageSize() called, pageSizeSet flag:', this.pageSizeSet);
+
+        // Only set page size once to avoid infinite loops
+        if (this.pageSizeSet) {
+            console.log('[GridComponent] Page size already set, skipping');
+            return false;
+        }
+
+        // Check if dataset and paging are available
+        if (dataset && dataset.paging) {
+            const currentPageSize = dataset.paging.pageSize;
+            const totalCount = dataset.paging.totalResultCount;
+
+            console.log(`[GridComponent] Paging info - Current pageSize: ${currentPageSize}, Total records: ${totalCount}, hasNextPage: ${dataset.paging.hasNextPage}`);
+
+            // Set page size to 5000 (maximum allowed by Dataverse)
+            // This will load all records up to 5000 in a single page
+            if (currentPageSize < 5000) {
+                console.log(`[GridComponent] Setting page size from ${currentPageSize} to 5000`);
+                dataset.paging.setPageSize(5000);
+                console.log(`[GridComponent] Page size after setting: ${dataset.paging.pageSize}`);
+
+                // Mark that we've set the page size
+                this.pageSizeSet = true;
+
+                // Refresh the dataset to load all records with the new page size
+                console.log(`[GridComponent] Calling dataset.refresh() to reload with new page size`);
+                dataset.refresh();
+
+                // Return true to indicate we triggered a refresh
+                return true;
+            } else {
+                console.log(`[GridComponent] Page size already at maximum (${currentPageSize})`);
+                this.pageSizeSet = true;
+            }
+        } else {
+            console.warn('[GridComponent] Cannot set page size - paging not available!', {
+                hasDataset: !!dataset,
+                hasPaging: !!(dataset && dataset.paging)
+            });
+        }
+
+        return false;
     }
 
     componentWillUnmount(): void {
@@ -85,12 +165,23 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
         if (this.successMessageTimer) {
             clearTimeout(this.successMessageTimer);
         }
+        // Clean up scroll event listeners
+        if (this.bodyRef.current) {
+            this.bodyRef.current.removeEventListener('scroll', this.handleBodyScroll);
+        }
     }
 
     componentDidUpdate(prevProps: IGridProps): void {
         // Reload data if dataset changes
         if (prevProps.dataset !== this.props.dataset) {
-            this.loadData();
+            // Ensure max page size is set for new dataset
+            const needsRefresh = this.setMaxPageSize();
+
+            // Only load data if we didn't trigger a refresh
+            // (refresh will trigger updateView which will call componentDidUpdate again with new data)
+            if (!needsRefresh) {
+                this.loadData();
+            }
         }
 
         // Recalculate aggregations if mode changes
@@ -104,6 +195,9 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
                 readOnlyFieldsSet: this.parseReadOnlyFields(this.props.readOnlyFields)
             });
         }
+
+        // Re-setup scroll sync if needed
+        this.setupScrollSync();
     }
 
     private parseReadOnlyFields(readOnlyFieldsString: string): Set<string> {
@@ -123,6 +217,7 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
     private isFieldEditable(columnName: string): boolean {
         // Check if field is in the read-only configuration
         if (this.state.readOnlyFieldsSet.has(columnName)) {
+            console.log(`[GridComponent] Field ${columnName} is in read-only configuration`);
             return false;
         }
 
@@ -134,11 +229,134 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
 
         // Check if column is the primary field (usually read-only)
         if (column.isPrimary) {
+            console.log(`[GridComponent] Field ${columnName} is primary field - not editable`);
+            return false;
+        }
+
+        // FIRST: Check the real metadata from Dataverse API (if loaded)
+        const realMetadata = this.entityMetadata.get(columnName);
+        if (realMetadata) {
+            // Use the authoritative IsValidForUpdate from the server
+            if (realMetadata.isValidForUpdate === false) {
+                console.log(`[GridComponent] Field ${columnName} is not valid for update (from server metadata: IsValidForUpdate=false)`);
+                return false;
+            }
+
+            // Check if it's a Virtual attribute type (from server metadata)
+            if (realMetadata.attributeType === 'Virtual') {
+                console.log(`[GridComponent] Field ${columnName} is virtual/computed field (from server metadata)`);
+                return false;
+            }
+        }
+
+        // FALLBACK: Get column metadata from PCF dataset (less reliable)
+        const columnMetadata = getColumnMetadata(this.props.dataset, columnName);
+        if (!columnMetadata) {
+            return false;
+        }
+
+        // If we don't have real metadata yet, use the PCF dataset metadata as fallback
+        if (!realMetadata) {
+            // Check if field is marked as not valid for update (from PCF dataset - may be incomplete)
+            if (columnMetadata.isValidForUpdate === false) {
+                console.log(`[GridComponent] Field ${columnName} is not valid for update (from PCF dataset)`);
+                return false;
+            }
+
+            // Check if it's a virtual field (from PCF dataset)
+            if (columnMetadata.isVirtualField) {
+                console.log(`[GridComponent] Field ${columnName} is virtual/computed field - not editable`);
+                return false;
+            }
+        }
+
+        // Check if it's a name field (logical representation of lookup fields)
+        // These end with "name" or "yominame" and are display-only
+        if (columnMetadata.isNameField) {
+            console.log(`[GridComponent] Field ${columnName} is a name field (logical/display-only) - not editable`);
+            return false;
+        }
+
+        // Check if this field type can be edited in a grid context
+        const dataType = columnMetadata.dataType;
+        if (!isFieldEditableByType(dataType)) {
+            console.log(`[GridComponent] Field ${columnName} with type ${dataType} is not editable in grid`);
             return false;
         }
 
         // Default to editable
         return true;
+    }
+
+    private async loadEntityMetadata(): Promise<void> {
+        try {
+            const entityType = this.props.dataset.getTargetEntityType();
+            if (!entityType) {
+                console.warn('[GridComponent] Unable to load entity metadata: No entity type available');
+                return;
+            }
+
+            console.log(`[GridComponent] Loading entity metadata for: ${entityType}`);
+
+            // Try to get the client URL from Xrm context
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
+            const globalContext = (window as any).Xrm?.Utility?.getGlobalContext?.();
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+            const clientUrl = globalContext?.getClientUrl?.() ||
+                             // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+                             (window as any).parent?.Xrm?.Utility?.getGlobalContext?.()?.getClientUrl?.();
+
+            if (!clientUrl) {
+                console.warn('[GridComponent] Could not determine client URL for metadata fetch');
+                return;
+            }
+
+            // Fetch entity metadata with IsValidForUpdate property
+            const apiUrl = `${clientUrl}/api/data/v9.2/EntityDefinitions(LogicalName='${entityType}')?$select=LogicalName&$expand=Attributes($select=LogicalName,IsValidForUpdate,AttributeType)`;
+
+            const response = await fetch(apiUrl, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                    'OData-MaxVersion': '4.0',
+                    'OData-Version': '4.0'
+                },
+                credentials: 'same-origin'
+            });
+
+            if (!response.ok) {
+                console.warn('[GridComponent] Failed to fetch entity metadata:', response.status, response.statusText);
+                return;
+            }
+
+            const data = await response.json();
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+            if (data?.Attributes && Array.isArray(data.Attributes)) {
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call
+                data.Attributes.forEach((attr: any) => {
+                    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+                    const logicalName = attr.LogicalName as string;
+                    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+                    const isValidForUpdate = attr.IsValidForUpdate as boolean;
+                    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+                    const attributeType = attr.AttributeType as string;
+
+                    if (logicalName) {
+                        this.entityMetadata.set(logicalName, {
+                            isValidForUpdate: isValidForUpdate ?? true,
+                            attributeType: attributeType || 'Unknown'
+                        });
+                    }
+                });
+
+                console.log(`[GridComponent] Loaded metadata for ${this.entityMetadata.size} attributes`);
+
+                // Force a re-render now that we have metadata
+                this.forceUpdate();
+            }
+        } catch (error) {
+            console.error('[GridComponent] Error loading entity metadata:', error);
+        }
     }
 
     private async loadColumnDescriptions(): Promise<void> {
@@ -334,7 +552,10 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
 
     private loadData = (): void => {
         try {
+            console.log('[GridComponent] loadData() called');
             const records = this.loadRecordsFromDataset(this.props.dataset);
+            console.log(`[GridComponent] Loaded ${records.length} records from dataset`);
+
             this.changeTracker.initializeData(records);
 
             // Initialize columns with default widths
@@ -364,8 +585,11 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
 
     private loadRecordsFromDataset(dataset: ComponentFramework.PropertyTypes.DataSet): any[] {
         if (!dataset || !dataset.sortedRecordIds) {
+            console.warn('[GridComponent] loadRecordsFromDataset - No dataset or sortedRecordIds');
             return [];
         }
+
+        console.log(`[GridComponent] loadRecordsFromDataset - sortedRecordIds.length: ${dataset.sortedRecordIds.length}`);
 
         return dataset.sortedRecordIds.map(id => {
             const record: any = { id: id };
@@ -482,12 +706,12 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
     }
 
     private calculateOptimalColumnWidth = (columnName: string, displayName: string, data: any[]): number => {
-        // Base width calculation factors (reduced by 50%)
-        const CHAR_WIDTH = 3; // Average character width in pixels (was 6)
-        const PADDING = -5; // Cell padding + borders (was -10)
-        const MIN_WIDTH = 10; // Reduced by 50% (was 20)
-        const MAX_WIDTH = 100; // Reduced by 50% (was 200)
-        const HEADER_EXTRA = 8; // Extra space for sort icon, filter, dropdown (was 15)
+        // Base width calculation factors
+        const CHAR_WIDTH = 8; // Average character width in pixels
+        const PADDING = 24; // Cell padding + borders + margin
+        const MIN_WIDTH = 100; // Minimum column width
+        const MAX_WIDTH = 300; // Maximum column width
+        const HEADER_EXTRA = 40; // Extra space for sort icon, filter, dropdown
 
         // Calculate width based on column header name
         const headerWidth = (displayName.length * CHAR_WIDTH) + HEADER_EXTRA;
@@ -554,16 +778,14 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
                 key: col.name,
                 name: columnDisplayName,
                 fieldName: col.name,
-                minWidth: 10,
-                maxWidth: 100,
+                minWidth: 100,
+                maxWidth: 300,
                 currentWidth: columnWidth,
                 isResizable: true,
                 isSorted: isSorted,
                 isSortedDescending: isSorted ? isSortDescending : undefined,
-                columnActionsMode: ColumnActionsMode.hasDropdown,
-                onColumnClick: (ev, column) => this.handleSort(column),
+                columnActionsMode: ColumnActionsMode.disabled,
                 onRender: (item: any) => this.renderCell(item, col.name),
-                onRenderHeader: () => this.renderColumnHeader(col.name, hasFilter),
                 flexGrow: 0
             };
         });
@@ -581,127 +803,153 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
         }));
     }
 
-    private renderColumnHeader = (columnName: string, hasFilter: boolean): JSX.Element => {
-        const filterValue = this.state.columnFilters[columnName] || '';
-        const column = this.props.dataset.columns.find(col => col.name === columnName);
-        const originalDisplayName = column?.displayName || columnName;
-
-        // Determine what to show in the header and tooltip
-        let headerText = originalDisplayName;
-        let tooltipText = '';
-
-        if (this.props.useDescriptionAsColumnName) {
-            const description = this.columnDescriptions.get(columnName);
-            // Ensure description is a string before using trim()
-            if (description && typeof description === 'string' && description.trim() !== '') {
-                // Use description as header, original display name as tooltip
-                headerText = description;
-                tooltipText = originalDisplayName;
-            } else {
-                // No description available, just use display name
-                tooltipText = '';
-            }
-        } else {
-            // Original behavior: use display name as header, description as tooltip
-            tooltipText = this.columnDescriptions.get(columnName) ||
-                        (column as any)?.description ||
-                        (column as any)?.metadata?.description ||
-                        (column as any)?.tooltip ||
-                        '';
-        }
-
-        const hasTooltip = typeof tooltipText === 'string' && tooltipText.trim().length > 0;
-
-        // Enhanced debug logging
-        console.log(`[Tooltip Debug] Column: ${columnName}`);
-        console.log(`  - From Map: ${this.columnDescriptions.get(columnName)}`);
-        console.log(`  - Header text: ${headerText}`);
-        console.log(`  - Tooltip text: ${tooltipText}`);
-        console.log(`  - Has tooltip: ${hasTooltip}`);
-
-        // Header content with optional Info icon
-        const headerContent = (
-            <React.Fragment>
-                <span className="column-name">{headerText}</span>
-                {hasTooltip && (
-                    <Icon
-                        iconName="Info"
-                        className="column-info-icon"
-                        styles={{
-                            root: {
-                                marginLeft: 4,
-                                fontSize: 12,
-                                color: '#605e5c',
-                                verticalAlign: 'middle',
-                                cursor: 'help'
-                            }
-                        }}
-                    />
-                )}
-            </React.Fragment>
-        );
-
-        const titleContent = (
-            <div className="column-header-title">
-                {hasTooltip ? (
-                    <TooltipHost
-                        content={
-                            <div style={{ maxWidth: 300 }}>
-                                <strong>{headerText}</strong>
-                                <br />
-                                <span style={{ fontSize: '12px' }}>{tooltipText}</span>
-                            </div>
-                        }
-                        id={`col-tooltip-${columnName}`}
-                        calloutProps={{
-                            gapSpace: 0,
-                            beakWidth: 10
-                        }}
-                        styles={{
-                            root: { display: 'inline-block', cursor: 'help' }
-                        }}
-                    >
-                        {headerContent}
-                    </TooltipHost>
-                ) : (
-                    headerContent
-                )}
-            </div>
-        );
-
+    private renderCustomHeader = (): JSX.Element => {
         return (
-            <div className="column-header-container">
-                {titleContent}
-                <div className="column-filter" onClick={(e) => e.stopPropagation()}>
-                    <TextField
-                        placeholder="Filter..."
-                        value={filterValue}
-                        onChange={(e, newValue) => this.handleFilter(columnName, newValue || '')}
-                        ariaLabel={`Filter ${headerText} column`}
-                        styles={{
-                            root: { marginTop: 4 },
-                            field: { fontSize: 12, padding: '2px 4px' }
-                        }}
-                        iconProps={hasFilter ? { iconName: 'Filter', style: { color: '#0078d4' } } : undefined}
-                    />
-                    {hasFilter && (
-                        <Icon
-                            iconName="Cancel"
-                            onClick={() => this.clearFilter(columnName)}
-                            aria-label={`Clear filter on ${headerText}`}
-                            role="button"
-                            tabIndex={0}
-                            styles={{
-                                root: {
-                                    cursor: 'pointer',
-                                    fontSize: 12,
-                                    color: '#605e5c',
-                                    marginLeft: 4,
-                                    ':hover': { color: '#0078d4' }
-                                }
-                            }}
-                        />
-                    )}
+            <div className="custom-sticky-header" ref={this.headerRef}>
+                {/* Column Headers Row */}
+                <div className="custom-header-row">
+                    {this.state.columns.map(col => {
+                        const columnName = col.key;
+                        const column = this.props.dataset.columns.find(c => c.name === columnName);
+                        const originalDisplayName = column?.displayName || columnName;
+
+                        // Determine what to show in the header and tooltip
+                        let headerText = originalDisplayName;
+                        let tooltipText = '';
+
+                        if (this.props.useDescriptionAsColumnName) {
+                            const description = this.columnDescriptions.get(columnName);
+                            if (description && typeof description === 'string' && description.trim() !== '') {
+                                headerText = description;
+                                tooltipText = originalDisplayName;
+                            }
+                        } else {
+                            tooltipText = this.columnDescriptions.get(columnName) ||
+                                        (column as any)?.description ||
+                                        (column as any)?.metadata?.description ||
+                                        (column as any)?.tooltip ||
+                                        '';
+                        }
+
+                        const hasTooltip = typeof tooltipText === 'string' && tooltipText.trim().length > 0;
+
+                        const headerContent = (
+                            <React.Fragment>
+                                <span className="column-name">{headerText}</span>
+                                {hasTooltip && (
+                                    <Icon
+                                        iconName="Info"
+                                        className="column-info-icon"
+                                        styles={{
+                                            root: {
+                                                marginLeft: 4,
+                                                fontSize: 12,
+                                                color: '#605e5c',
+                                                verticalAlign: 'middle',
+                                                cursor: 'help'
+                                            }
+                                        }}
+                                    />
+                                )}
+                            </React.Fragment>
+                        );
+
+                        return (
+                            <div
+                                key={`header-${columnName}`}
+                                className="custom-header-cell"
+                                style={{
+                                    width: col.currentWidth || col.minWidth,
+                                    minWidth: col.minWidth,
+                                    maxWidth: col.maxWidth
+                                }}
+                                onClick={() => this.handleSort(col)}
+                            >
+                                {hasTooltip ? (
+                                    <TooltipHost
+                                        content={
+                                            <div style={{ maxWidth: 300 }}>
+                                                <strong>{headerText}</strong>
+                                                <br />
+                                                <span style={{ fontSize: '12px' }}>{tooltipText}</span>
+                                            </div>
+                                        }
+                                        id={`col-tooltip-${columnName}`}
+                                        calloutProps={{
+                                            gapSpace: 0,
+                                            beakWidth: 10
+                                        }}
+                                    >
+                                        {headerContent}
+                                    </TooltipHost>
+                                ) : (
+                                    headerContent
+                                )}
+                                {/* Sort indicator */}
+                                {this.state.sortColumn === columnName && (
+                                    <Icon
+                                        iconName={this.state.isSortDescending ? 'SortDown' : 'SortUp'}
+                                        styles={{ root: { marginLeft: 4, fontSize: 12 } }}
+                                    />
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+
+                {/* Filter Row */}
+                <div className="custom-filter-row">
+                    {this.state.columns.map(col => {
+                        const columnName = col.key;
+                        const filterValue = this.state.columnFilters[columnName] || '';
+                        const hasFilter = filterValue.length > 0;
+                        const column = this.props.dataset.columns.find(c => c.name === columnName);
+                        const headerText = column?.displayName || columnName;
+
+                        return (
+                            <div
+                                key={`filter-${columnName}`}
+                                className="custom-filter-cell"
+                                style={{
+                                    width: col.currentWidth || col.minWidth,
+                                    minWidth: col.minWidth,
+                                    maxWidth: col.maxWidth
+                                }}
+                            >
+                                <TextField
+                                    placeholder="Filter..."
+                                    value={filterValue}
+                                    onChange={(e, newValue) => this.handleFilter(columnName, newValue || '')}
+                                    ariaLabel={`Filter ${headerText} column`}
+                                    styles={{
+                                        root: { width: '100%' },
+                                        field: { fontSize: 12, padding: '4px 8px', height: 28 }
+                                    }}
+                                />
+                                {hasFilter && (
+                                    <Icon
+                                        iconName="Cancel"
+                                        onClick={() => this.clearFilter(columnName)}
+                                        aria-label={`Clear filter on ${headerText}`}
+                                        role="button"
+                                        tabIndex={0}
+                                        styles={{
+                                            root: {
+                                                cursor: 'pointer',
+                                                fontSize: 12,
+                                                color: '#605e5c',
+                                                position: 'absolute',
+                                                right: 8,
+                                                top: '50%',
+                                                transform: 'translateY(-50%)',
+                                                ':hover': { color: '#0078d4' }
+                                            }
+                                        }}
+                                    />
+                                )}
+                            </div>
+                        );
+                    })}
                 </div>
             </div>
         );
@@ -714,12 +962,33 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
         const column = this.props.dataset.columns.find(col => col.name === columnName);
         const displayName = column?.displayName || columnName;
 
+        // Get metadata to determine WHY field is not editable (for better UX)
+        const columnMetadata = getColumnMetadata(this.props.dataset, columnName);
+        let readOnlyReason = '';
+        if (!isEditable) {
+            if (column?.isPrimary) {
+                readOnlyReason = 'Primary key field';
+            } else if (columnMetadata?.isVirtualField) {
+                readOnlyReason = 'Virtual/computed field';
+            } else if (columnMetadata?.isNameField) {
+                readOnlyReason = 'Display-only name field';
+            } else if (columnMetadata?.isValidForUpdate === false) {
+                readOnlyReason = 'System field or read-only by design';
+            } else if (this.state.readOnlyFieldsSet.has(columnName)) {
+                readOnlyReason = 'Configured as read-only';
+            } else {
+                readOnlyReason = 'Field type not supported for inline editing';
+            }
+        }
+
         const cellStyle: React.CSSProperties = {
             backgroundColor: isChanged && this.props.enableChangeTracking
                 ? this.props.changedCellColor
                 : isEditable ? 'transparent' : '#f3f2f1',
             padding: '2px 4px',
-            transition: 'all 0.2s ease-in-out'
+            transition: 'all 0.2s ease-in-out',
+            cursor: isEditable ? 'text' : 'not-allowed',
+            opacity: isEditable ? 1 : 0.7
         };
 
         const cellClassName = isEditable
@@ -728,7 +997,7 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
 
         const ariaLabel = isEditable
             ? `Edit ${displayName} for record ${item.id}${isChanged ? ' (modified)' : ''}`
-            : `${displayName}: ${value} (read-only)`;
+            : `${displayName}: ${value} (read-only: ${readOnlyReason})`;
 
         return (
             <div style={cellStyle} className={cellClassName} tabIndex={-1} role="gridcell" aria-label={ariaLabel}>
@@ -747,7 +1016,12 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
                         }}
                     />
                 ) : (
-                    <span className="readonly-text" title="This field is read-only" role="text">
+                    <span
+                        className="readonly-text"
+                        title={`This field is read-only: ${readOnlyReason}`}
+                        role="text"
+                        style={{ color: '#605e5c', fontStyle: 'italic' }}
+                    >
                         {value}
                     </span>
                 )}
@@ -762,6 +1036,17 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
 
         // Convert the value based on the column's actual data type
         const processedValue = convertValueByDataType(newValue, dataType, columnName);
+
+        // If processedValue is undefined, it means this field should not be updated
+        if (processedValue === undefined) {
+            console.warn(`[GridComponent] Field ${columnName} cannot be updated directly. Skipping.`);
+            // Reset the field value to its original
+            this.setState((prevState) => ({
+                currentData: prevState.currentData,
+                filteredData: prevState.filteredData
+            }));
+            return;
+        }
 
         console.log(`[GridComponent] Cell change for ${columnName}:`, {
             originalValue: newValue,
@@ -845,7 +1130,7 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
 
     render(): JSX.Element {
         const { isLoading, isSaving, errorMessage, successMessage, filteredData, currentData, columnFilters } = this.state;
-        const changedCount = this.changeTracker.getChangedRecordsCount();
+        const changedCount = this.changeTracker.getChangedCellsCount();
         const hasChanges = changedCount > 0;
         const activeFilterCount = Object.keys(columnFilters).filter(k => columnFilters[k]).length;
 
@@ -920,14 +1205,20 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
                 )}
 
                 <div className="grid-content">
-                    <DetailsList
-                        items={filteredData}
-                        columns={columns}
-                        layoutMode={DetailsListLayoutMode.fixedColumns}
-                        selectionMode={SelectionMode.none}
-                        isHeaderVisible={true}
-                        onColumnResize={this.handleColumnResize}
-                    />
+                    {/* Custom sticky header with filters */}
+                    {this.renderCustomHeader()}
+
+                    {/* Data rows only - header is hidden */}
+                    <div className="grid-body" ref={this.bodyRef}>
+                        <DetailsList
+                            items={filteredData}
+                            columns={columns}
+                            layoutMode={DetailsListLayoutMode.fixedColumns}
+                            selectionMode={SelectionMode.none}
+                            isHeaderVisible={false}
+                            onColumnResize={this.handleColumnResize}
+                        />
+                    </div>
                 </div>
 
                 <AggregationFooter

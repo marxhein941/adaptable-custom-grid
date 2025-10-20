@@ -3,9 +3,10 @@
 .grid-change-tracker-container {
     display: flex;
     flex-direction: column;
-    height: 100%;
     width: 100%;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    /* Removed height: 100% to allow content to determine height */
+    /* This ensures the footer is always visible without needing to scroll the entire control */
 }
 
 /* Column Header Tooltip Styles */
@@ -72,10 +73,95 @@
 }
 
 .grid-content {
-    flex: 1;
+    /* Set max height to show approximately 12 rows plus header */
+    /* Row height ~42px + header ~42px = ~546px total */
+    max-height: 546px;
     overflow-x: auto;
     overflow-y: auto;
     width: 100%;
+    flex-shrink: 0;
+    position: relative;
+}
+
+/* Custom sticky header wrapper */
+.custom-sticky-header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background-color: #f3f2f1;
+    border-bottom: 1px solid #edebe9;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+/* Hide scrollbar for custom header to prevent double scrollbars */
+.custom-sticky-header::-webkit-scrollbar {
+    height: 0px;
+}
+
+/* Custom header row (column names) */
+.custom-header-row {
+    display: flex;
+    flex-direction: row;
+    background-color: #f3f2f1;
+    border-bottom: 1px solid #edebe9;
+    min-width: fit-content;
+    width: max-content;
+}
+
+.custom-header-cell {
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    flex-grow: 0;
+    box-sizing: border-box;
+    border-right: 1px solid #edebe9;
+    font-weight: 600;
+    font-size: 14px;
+    color: #323130;
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.2s ease;
+}
+
+.custom-header-cell:hover {
+    background-color: #edebe9;
+}
+
+.custom-header-cell:last-child {
+    border-right: none;
+}
+
+/* Custom filter row */
+.custom-filter-row {
+    display: flex;
+    flex-direction: row;
+    background-color: #faf9f8;
+    min-width: fit-content;
+    width: max-content;
+}
+
+.custom-filter-cell {
+    padding: 4px 8px;
+    display: flex;
+    align-items: center;
+    position: relative;
+    flex-shrink: 0;
+    flex-grow: 0;
+    box-sizing: border-box;
+    border-right: 1px solid #edebe9;
+}
+
+.custom-filter-cell:last-child {
+    border-right: none;
+}
+
+/* Grid body wrapper */
+.grid-body {
+    overflow-x: auto;
+    overflow-y: auto;
+    max-height: calc(546px - 84px); /* Total height minus header and filter row height */
 }
 
 /* Ensure DetailsList respects horizontal scrolling */
@@ -314,11 +400,7 @@
     border-color: transparent !important;
 }
 
-/* Column header with filter */
-.column-header-container {
-    width: 100%;
-}
-
+/* Column header styling */
 .column-header-title {
     font-size: 14px;
     font-weight: 600;
@@ -330,18 +412,6 @@
 
 .column-header-title:hover {
     color: #0078d4;
-}
-
-.column-filter {
-    padding: 4px 0;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-}
-
-.column-filter input {
-    font-size: 12px;
-    padding: 4px 6px;
 }
 
 /* Filter count indicator */
