@@ -18,27 +18,26 @@ export const AggregationFooter: React.FC<IAggregationFooterProps> = (props) => {
         return null;
     }
 
-    // Sync footer scroll with grid scroll
+    // Sync footer scroll with grid body scroll
     React.useEffect(() => {
-        const gridContent = document.querySelector('.grid-content');
-        const detailsListContent = gridContent?.querySelector('.ms-DetailsList-contentWrapper');
+        const gridBody = document.querySelector('.grid-body');
 
         const handleScroll = () => {
-            if (footerRef.current && gridContent) {
-                footerRef.current.scrollLeft = gridContent.scrollLeft;
+            if (footerRef.current && gridBody) {
+                footerRef.current.scrollLeft = gridBody.scrollLeft;
             }
         };
 
-        if (gridContent) {
-            gridContent.addEventListener('scroll', handleScroll);
-            return () => gridContent.removeEventListener('scroll', handleScroll);
+        if (gridBody) {
+            gridBody.addEventListener('scroll', handleScroll);
+            return () => gridBody.removeEventListener('scroll', handleScroll);
         }
     }, []);
 
-    // Observe column width changes from the actual rendered grid
+    // Observe column width changes from the custom header cells
     React.useEffect(() => {
         const updateColumnWidths = () => {
-            const headerCells = document.querySelectorAll('.ms-DetailsHeader-cell');
+            const headerCells = document.querySelectorAll('.custom-header-cell');
             const footerCells = footerRef.current?.querySelectorAll('.aggregation-cell');
 
             if (headerCells.length > 0 && footerCells && footerCells.length > 0) {
@@ -61,8 +60,8 @@ export const AggregationFooter: React.FC<IAggregationFooterProps> = (props) => {
             updateColumnWidths();
         });
 
-        // Observe all header cells
-        const headerCells = document.querySelectorAll('.ms-DetailsHeader-cell');
+        // Observe all custom header cells
+        const headerCells = document.querySelectorAll('.custom-header-cell');
         headerCells.forEach(cell => resizeObserver.observe(cell));
 
         // Cleanup

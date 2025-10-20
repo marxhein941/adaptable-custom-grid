@@ -281,7 +281,7 @@
 }
 
 .aggregation-cell {
-    padding: 12px 4px;
+    padding: 8px 12px;
     display: flex;
     align-items: center;
     justify-content: flex-start;
