@@ -123,6 +123,7 @@
     cursor: pointer;
     user-select: none;
     transition: background-color 0.2s ease;
+    overflow: hidden;
 }
 
 .custom-header-cell:hover {
@@ -451,6 +452,9 @@
     padding: 4px 0;
     cursor: pointer;
     transition: color 0.2s ease;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .column-header-title:hover {
