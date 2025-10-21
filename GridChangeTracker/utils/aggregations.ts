@@ -116,7 +116,7 @@ function calculateAverage(values: number[]): number {
 function formatAggregationValue(value: number, mode: AggregationMode): string {
     switch (mode) {
         case AggregationMode.Sum:
-            return `Sum: ${formatNumber(value)}`;
+            return formatNumber(value);
         case AggregationMode.Average:
             return `Avg: ${formatNumber(value)}`;
         case AggregationMode.Count:
@@ -128,14 +128,10 @@ function formatAggregationValue(value: number, mode: AggregationMode): string {
 
 /**
  * Format number with appropriate decimal places
+ * Always shows 2 decimal places, even when the value is a whole number (e.g., 3,000.00)
  */
 function formatNumber(value: number): string {
-    // Check if it's a whole number
-    if (Number.isInteger(value)) {
-        return value.toLocaleString();
-    }
-
-    // Format with 2 decimal places
+    // Always format with 2 decimal places, including for whole numbers
     return value.toLocaleString(undefined, {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2

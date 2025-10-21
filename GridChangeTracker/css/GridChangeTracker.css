@@ -554,3 +554,42 @@
     border-bottom: 1px dotted #8a8886;
     cursor: help;
 }
+
+/* Column resizing styles */
+.ms-DetailsHeader-cellSizer {
+    cursor: col-resize !important;
+}
+
+.ms-DetailsHeader-cellSizer:hover {
+    background: #0078d4;
+    opacity: 0.5;
+}
+
+/* Ensure proper column header cell positioning for resize handles */
+.ms-DetailsHeader-cell {
+    position: relative;
+}
+
+/* Visual feedback during resize */
+.ms-DetailsList.is-resizing {
+    cursor: col-resize !important;
+    user-select: none !important;
+}
+
+.ms-DetailsList.is-resizing * {
+    cursor: col-resize !important;
+    user-select: none !important;
+}
+
+/* Smooth transition for column width changes */
+.custom-header-cell,
+.custom-filter-cell {
+    transition: width 0.15s ease-out;
+}
+
+/* Ensure headers don't wrap during resize */
+.custom-header-cell .column-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}

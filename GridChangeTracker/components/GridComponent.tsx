@@ -9,8 +9,10 @@ import { TooltipHost } from '@fluentui/react/lib/Tooltip';
 import { ChangeTracker } from '../utils/changeTracker';
 import { calculateAggregations, AggregationMode, getAggregationMode, AggregationResult } from '../utils/aggregations';
 import { AggregationFooter } from './AggregationFooter';
+import { ColumnResizeHandle } from './ColumnResizeHandle';
 import { BUILD_TIMESTAMP } from '../buildConstants';
 import { debounce } from '../utils/debounce';
+import { throttle } from '../utils/throttle';
 import { getColumnDescriptions, defaultColumnDescriptions } from '../utils/metadataConfig';
 import { convertValueByDataType, getColumnMetadata, isFieldEditableByType } from '../utils/typeConverter';
 
@@ -43,12 +45,14 @@ interface IGridState {
     columnFilters: { [key: string]: string };
     columns: IColumn[];
     readOnlyFieldsSet: Set<string>;
+    columnWidths: Map<string, number>;  // Track custom column widths
 }
 
 export class GridComponent extends React.Component<IGridProps, IGridState> {
     private changeTracker: ChangeTracker;
     private successMessageTimer?: NodeJS.Timeout;
     private debouncedNotifyChange: (recordId: string, columnName: string, value: any) => void;
+    private throttledColumnResize: (columnKey: string, deltaX: number) => void;
     private columnDescriptions = new Map<string, string>();
     private entityMetadata = new Map<string, { isValidForUpdate: boolean; attributeType: string }>();
     private pageSizeSet = false; // Flag to track if we've set the max page size
@@ -65,6 +69,9 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
             this.props.onCellChange(recordId, columnName, value);
         }, 300);
 
+        // Throttle column resize to improve performance (~60fps)
+        this.throttledColumnResize = throttle(this.handleColumnResize.bind(this), 16);
+
         this.state = {
             currentData: [],
             filteredData: [],
@@ -77,7 +84,8 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
             isSortDescending: false,
             columnFilters: {},
             columns: [],
-            readOnlyFieldsSet: this.parseReadOnlyFields(props.readOnlyFields)
+            readOnlyFieldsSet: this.parseReadOnlyFields(props.readOnlyFields),
+            columnWidths: this.loadColumnWidths()
         };
     }
 
@@ -787,10 +795,12 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
             return [];
         }
 
-        const { sortColumn, isSortDescending, columnFilters, columns: stateColumns, filteredData } = this.state;
+        const { sortColumn, isSortDescending, columnFilters, columns: stateColumns, columnWidths, filteredData } = this.state;
 
-        // Fixed width for all columns - no dynamic sizing
-        const FIXED_COLUMN_WIDTH = 150;
+        // Column width constants
+        const DEFAULT_COLUMN_WIDTH = 150;
+        const MIN_COLUMN_WIDTH = 50;
+        const MAX_COLUMN_WIDTH = 400;
 
         return this.props.dataset.columns.map(col => {
             const isSorted = sortColumn === col.name;
@@ -804,11 +814,10 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
                 tooltip: (col as any).tooltip
             });
 
-            // Preserve existing column width if it exists (user has manually resized)
+            // Get column width from state (saved widths or existing resized width)
+            const savedWidth = columnWidths.get(col.name);
             const existingColumn = stateColumns.find(c => c.key === col.name);
-
-            // Use existing width if column was manually resized, otherwise use fixed width
-            const columnWidth = existingColumn?.currentWidth || FIXED_COLUMN_WIDTH;
+            const columnWidth = existingColumn?.currentWidth || savedWidth || DEFAULT_COLUMN_WIDTH;
 
             // Determine column display name based on useDescriptionAsColumnName setting
             let columnDisplayName = col.displayName;
@@ -824,10 +833,10 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
                 key: col.name,
                 name: columnDisplayName,
                 fieldName: col.name,
-                minWidth: FIXED_COLUMN_WIDTH,
-                maxWidth: FIXED_COLUMN_WIDTH,
+                minWidth: MIN_COLUMN_WIDTH,
+                maxWidth: MAX_COLUMN_WIDTH,
                 currentWidth: columnWidth,
-                isResizable: true,
+                isResizable: true,  // Enable resizing
                 isSorted: isSorted,
                 isSortedDescending: isSorted ? isSortDescending : undefined,
                 columnActionsMode: ColumnActionsMode.disabled,
@@ -837,17 +846,67 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
         });
     }
 
-    private handleColumnResize = (column?: IColumn, newWidth?: number): void => {
-        if (!column || !newWidth) return;
+    private handleColumnResize = (columnKey: string, deltaX: number): void => {
+        this.setState(prevState => {
+            const column = prevState.columns.find(col => col.key === columnKey);
+            if (!column) return null;
 
-        this.setState(prevState => ({
-            columns: prevState.columns.map(col =>
-                col.key === column.key
+            const currentWidth = column.currentWidth || 150;
+            const newWidth = Math.max(column.minWidth || 50, Math.min(currentWidth + deltaX, column.maxWidth || 400));
+
+            if (newWidth === currentWidth) return null;
+
+            const updatedColumns = prevState.columns.map(col =>
+                col.key === columnKey
                     ? { ...col, currentWidth: newWidth }
                     : col
-            )
-        }));
+            );
+
+            // Update saved widths
+            const newColumnWidths = new Map(prevState.columnWidths);
+            newColumnWidths.set(columnKey, newWidth);
+
+            // Save to localStorage
+            this.saveColumnWidths(newColumnWidths);
+
+            return {
+                ...prevState,
+                columns: updatedColumns,
+                columnWidths: newColumnWidths
+            };
+        });
     }
+
+    private saveColumnWidths = (widths: Map<string, number>): void => {
+        try {
+            const widthsObject: { [key: string]: number } = {};
+            widths.forEach((value, key) => {
+                widthsObject[key] = value;
+            });
+
+            const storageKey = `grid-column-widths-${this.props.dataset?.getTitle() || 'default'}`;
+            localStorage.setItem(storageKey, JSON.stringify(widthsObject));
+        } catch (error) {
+            console.error('Failed to save column widths:', error);
+        }
+    }
+
+    private loadColumnWidths = (): Map<string, number> => {
+        try {
+            const storageKey = `grid-column-widths-${this.props.dataset?.getTitle() || 'default'}`;
+            const saved = localStorage.getItem(storageKey);
+
+            if (saved) {
+                const widthsObject = JSON.parse(saved);
+                return new Map(Object.entries(widthsObject));
+            }
+        } catch (error) {
+            console.error('Failed to load column widths:', error);
+        }
+
+        return new Map<string, number>();
+    }
+
 
     private renderCustomHeader = (): JSX.Element => {
         return (
@@ -908,10 +967,12 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
                             <div
                                 key={`header-${columnName}`}
                                 className="custom-header-cell"
+                                data-column-key={columnName}
                                 style={{
                                     width: col.currentWidth || col.minWidth,
                                     minWidth: col.minWidth,
-                                    maxWidth: col.maxWidth
+                                    maxWidth: col.maxWidth,
+                                    position: 'relative'
                                 }}
                                 onClick={() => this.handleSort(col)}
                             >
@@ -936,6 +997,11 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
                                         styles={{ root: { marginLeft: 4, fontSize: 12 } }}
                                     />
                                 )}
+                                {/* Resize handle */}
+                                <ColumnResizeHandle
+                                    columnKey={columnName}
+                                    onResize={this.throttledColumnResize}
+                                />
                             </div>
                         );
                     })}
@@ -954,6 +1020,7 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
                             <div
                                 key={`filter-${columnName}`}
                                 className="custom-filter-cell"
+                                data-column-key={columnName}
                                 style={{
                                     width: col.currentWidth || col.minWidth,
                                     minWidth: col.minWidth,
