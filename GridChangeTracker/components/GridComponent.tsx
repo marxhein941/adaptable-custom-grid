@@ -24,8 +24,6 @@ export interface IGridProps {
     showChangeIndicator: boolean;
     readOnlyFields: string;
     useDescriptionAsColumnName: boolean;
-    filterField: string;
-    filterValue: string;
     onCellChange: (recordId: string, columnName: string, value: any) => void;
     onSave: () => Promise<void>;
     // Add context to access WebAPI
@@ -34,7 +32,6 @@ export interface IGridProps {
 
 interface IGridState {
     currentData: any[];
-    filteredData: any[];
     isLoading: boolean;
     isSaving: boolean;
     errorMessage: string | null;
@@ -42,7 +39,6 @@ interface IGridState {
     aggregations: AggregationResult;
     sortColumn: string | null;
     isSortDescending: boolean;
-    columnFilters: { [key: string]: string };
     columns: IColumn[];
     readOnlyFieldsSet: Set<string>;
     columnWidths: Map<string, number>;  // Track custom column widths
@@ -74,7 +70,6 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
 
         this.state = {
             currentData: [],
-            filteredData: [],
             isLoading: true,
             isSaving: false,
             errorMessage: null,
@@ -82,7 +77,6 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
             aggregations: {},
             sortColumn: null,
             isSortDescending: false,
-            columnFilters: {},
             columns: [],
             readOnlyFieldsSet: this.parseReadOnlyFields(props.readOnlyFields),
             columnWidths: this.loadColumnWidths()
@@ -90,9 +84,6 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
     }
 
     componentDidMount(): void {
-        // Apply filter if specified
-        this.applyFilter();
-
         // Set page size to maximum to load all records at once
         const needsRefresh = this.setMaxPageSize();
 
@@ -109,44 +100,6 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
         this.setupScrollSync();
     }
 
-    private applyFilter = (): void => {
-        const { filterField, filterValue, dataset } = this.props;
-
-        // Skip if no filter is configured
-        if (!filterField || !filterValue || filterField.trim() === '' || filterValue.trim() === '') {
-            console.log('[GridComponent] No filter configured, skipping filtering');
-            return;
-        }
-
-        try {
-            console.log('[GridComponent] Applying filter:', { filterField, filterValue });
-
-            // Use dataset filtering API
-            const filterExpression = {
-                conditions: [
-                    {
-                        attributeName: filterField,
-                        conditionOperator: 0, // Equal (ConditionOperator.Equal)
-                        value: filterValue
-                    }
-                ],
-                filterOperator: 0 // And (LogicalOperator.And)
-            };
-
-            console.log('[GridComponent] Filter expression:', JSON.stringify(filterExpression, null, 2));
-
-            // Apply the filter using the dataset filtering API
-            if (dataset.filtering) {
-                dataset.filtering.clearFilter();
-                dataset.filtering.setFilter(filterExpression as any);
-                console.log('[GridComponent] Filter applied successfully');
-            } else {
-                console.warn('[GridComponent] Dataset filtering API not available');
-            }
-        } catch (error) {
-            console.error('[GridComponent] Error applying filter:', error);
-        }
-    }
 
     private setupScrollSync = (): void => {
         if (this.bodyRef.current) {
@@ -224,12 +177,6 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
     }
 
     componentDidUpdate(prevProps: IGridProps): void {
-        // Reapply filter if filter configuration changes
-        if (prevProps.filterField !== this.props.filterField || prevProps.filterValue !== this.props.filterValue) {
-            console.log('[GridComponent] Filter configuration changed, reapplying filter');
-            this.applyFilter();
-        }
-
         // Reload data if dataset changes
         if (prevProps.dataset !== this.props.dataset) {
             // Ensure max page size is set for new dataset
@@ -621,12 +568,10 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
 
             this.setState({
                 currentData: records,
-                filteredData: records,
                 isLoading: false,
                 errorMessage: null,
                 sortColumn: null,
                 isSortDescending: false,
-                columnFilters: {},
                 columns: initialColumns
             }, () => {
                 this.calculateAggregations();
@@ -675,7 +620,7 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
         }
 
         const aggregations = calculateAggregations(
-            this.state.filteredData,
+            this.state.currentData,
             this.props.dataset.columns,
             mode
         );
@@ -684,14 +629,14 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
     }
 
     private handleSort = (column: IColumn): void => {
-        const { filteredData, sortColumn, isSortDescending } = this.state;
+        const { currentData, sortColumn, isSortDescending } = this.state;
         const columnName = column.fieldName || column.key;
 
         // Determine new sort direction
         const newIsSortDescending = sortColumn === columnName ? !isSortDescending : false;
 
         // Sort the data
-        const sortedData = [...filteredData].sort((a, b) => {
+        const sortedData = [...currentData].sort((a, b) => {
             const aValue = a[columnName] || '';
             const bValue = b[columnName] || '';
 
@@ -712,7 +657,7 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
         });
 
         this.setState({
-            filteredData: sortedData,
+            currentData: sortedData,
             sortColumn: columnName,
             isSortDescending: newIsSortDescending
         }, () => {
@@ -720,48 +665,6 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
         });
     }
 
-    private handleFilter = (columnName: string, filterText: string): void => {
-        const { currentData, columnFilters } = this.state;
-
-        // Update the filter for this column
-        const newFilters = {
-            ...columnFilters,
-            [columnName]: filterText
-        };
-
-        // Apply all filters
-        let filtered = [...currentData];
-        Object.keys(newFilters).forEach(colName => {
-            const filter = newFilters[colName];
-            if (filter && filter.trim()) {
-                filtered = filtered.filter(item => {
-                    const value = String(item[colName] || '').toLowerCase();
-                    return value.includes(filter.toLowerCase());
-                });
-            }
-        });
-
-        this.setState({
-            filteredData: filtered,
-            columnFilters: newFilters,
-            sortColumn: null,
-            isSortDescending: false
-        }, () => {
-            this.calculateAggregations();
-        });
-    }
-
-    private clearFilter = (columnName: string): void => {
-        const { columnFilters } = this.state;
-        const newFilters = { ...columnFilters };
-        delete newFilters[columnName];
-
-        // Reapply all remaining filters
-        this.setState({ columnFilters: {} }, () => {
-            this.handleFilter(columnName, '');
-            this.setState({ columnFilters: newFilters });
-        });
-    }
 
     private calculateOptimalColumnWidth = (columnName: string, displayName: string, data: any[]): number => {
         // Base width calculation factors
@@ -795,7 +698,7 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
             return [];
         }
 
-        const { sortColumn, isSortDescending, columnFilters, columns: stateColumns, columnWidths, filteredData } = this.state;
+        const { sortColumn, isSortDescending, columns: stateColumns, columnWidths, currentData } = this.state;
 
         // Column width constants
         const DEFAULT_COLUMN_WIDTH = 150;
@@ -804,7 +707,6 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
 
         return this.props.dataset.columns.map(col => {
             const isSorted = sortColumn === col.name;
-            const hasFilter = !!columnFilters[col.name];
 
             // Debug: Log column metadata to verify description availability
             console.log(`[Column ${col.name}]`, {
@@ -1006,72 +908,16 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
                         );
                     })}
                 </div>
-
-                {/* Filter Row */}
-                <div className="custom-filter-row">
-                    {this.state.columns.map(col => {
-                        const columnName = col.key;
-                        const filterValue = this.state.columnFilters[columnName] || '';
-                        const hasFilter = filterValue.length > 0;
-                        const column = this.props.dataset.columns.find(c => c.name === columnName);
-                        const headerText = column?.displayName || columnName;
-
-                        return (
-                            <div
-                                key={`filter-${columnName}`}
-                                className="custom-filter-cell"
-                                data-column-key={columnName}
-                                style={{
-                                    width: col.currentWidth || col.minWidth,
-                                    minWidth: col.minWidth,
-                                    maxWidth: col.maxWidth
-                                }}
-                            >
-                                <TextField
-                                    placeholder="Filter..."
-                                    value={filterValue}
-                                    onChange={(e, newValue) => this.handleFilter(columnName, newValue || '')}
-                                    ariaLabel={`Filter ${headerText} column`}
-                                    styles={{
-                                        root: { width: '100%' },
-                                        field: { fontSize: 12, padding: '4px 8px', height: 28 }
-                                    }}
-                                />
-                                {hasFilter && (
-                                    <Icon
-                                        iconName="Cancel"
-                                        onClick={() => this.clearFilter(columnName)}
-                                        aria-label={`Clear filter on ${headerText}`}
-                                        role="button"
-                                        tabIndex={0}
-                                        styles={{
-                                            root: {
-                                                cursor: 'pointer',
-                                                fontSize: 12,
-                                                color: '#605e5c',
-                                                position: 'absolute',
-                                                right: 8,
-                                                top: '50%',
-                                                transform: 'translateY(-50%)',
-                                                ':hover': { color: '#0078d4' }
-                                            }
-                                        }}
-                                    />
-                                )}
-                            </div>
-                        );
-                    })}
-                </div>
             </div>
         );
     }
 
     private renderCustomRows = (): JSX.Element => {
-        const { filteredData, columns } = this.state;
+        const { currentData, columns } = this.state;
 
         return (
             <div className="custom-data-rows">
-                {filteredData.map((item, rowIndex) => (
+                {currentData.map((item, rowIndex) => (
                     <div key={item.id || rowIndex} className="custom-data-row">
                         {columns.map(col => {
                             const columnName = col.key;
@@ -1187,8 +1033,7 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
             console.warn(`[GridComponent] Field ${columnName} cannot be updated directly. Skipping.`);
             // Reset the field value to its original
             this.setState((prevState) => ({
-                currentData: prevState.currentData,
-                filteredData: prevState.filteredData
+                currentData: prevState.currentData
             }));
             return;
         }
@@ -1208,13 +1053,6 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
                 : record
         );
 
-        // Update filtered data
-        const updatedFilteredData = this.state.filteredData.map(record =>
-            record.id === recordId
-                ? { ...record, [columnName]: processedValue }
-                : record
-        );
-
         // Track the change with the processed value
         this.changeTracker.trackChange(recordId, columnName, processedValue);
 
@@ -1222,8 +1060,7 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
         this.debouncedNotifyChange(recordId, columnName, processedValue);
 
         this.setState({
-            currentData: updatedCurrentData,
-            filteredData: updatedFilteredData
+            currentData: updatedCurrentData
         }, () => {
             // Recalculate aggregations
             this.calculateAggregations();
@@ -1274,10 +1111,9 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
     }
 
     render(): JSX.Element {
-        const { isLoading, isSaving, errorMessage, successMessage, filteredData, currentData, columnFilters } = this.state;
+        const { isLoading, isSaving, errorMessage, successMessage, currentData } = this.state;
         const changedCount = this.changeTracker.getChangedCellsCount();
         const hasChanges = changedCount > 0;
-        const activeFilterCount = Object.keys(columnFilters).filter(k => columnFilters[k]).length;
 
         if (isLoading) {
             return (
@@ -1294,11 +1130,6 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
                 <div className="grid-change-tracker-header">
                     <div className="grid-change-tracker-title">
                         {this.props.dataset.getTitle() || 'Grid Change Tracker'}
-                        {activeFilterCount > 0 && (
-                            <span className="filter-count">
-                                ({filteredData.length} of {currentData.length} records)
-                            </span>
-                        )}
                         <span className="deployment-timestamp" title="Last deployment">
                             v{BUILD_TIMESTAMP}
                         </span>

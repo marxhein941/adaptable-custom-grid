@@ -111,16 +111,6 @@ export class GridChangeTracker implements ComponentFramework.ReactControl<IInput
                 );
             }
 
-            // Get filter parameters and resolve special tokens
-            const filterField = context.parameters.filterField?.raw || "";
-            let filterValue = context.parameters.filterValue?.raw || "";
-
-            // Resolve {CurrentUser} token to actual user ID
-            if (filterValue === "{CurrentUser}") {
-                filterValue = context.userSettings.userId;
-                console.log('[GridChangeTracker] Resolved {CurrentUser} to:', filterValue);
-            }
-
             // Build props for React component
             const props: IGridProps = {
                 dataset: dataset,
@@ -130,8 +120,6 @@ export class GridChangeTracker implements ComponentFramework.ReactControl<IInput
                 showChangeIndicator: context.parameters.showChangeIndicator?.raw ?? true,
                 readOnlyFields: context.parameters.readOnlyFields?.raw || "",
                 useDescriptionAsColumnName: context.parameters.useDescriptionAsColumnName?.raw ?? false,
-                filterField: filterField,
-                filterValue: filterValue,
                 onCellChange: this.handleCellChange.bind(this),
                 onSave: this.handleSave.bind(this),
                 // Pass the full context so GridComponent can access WebAPI

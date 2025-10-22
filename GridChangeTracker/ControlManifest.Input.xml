@@ -60,22 +60,6 @@
               required="false"
               default-value="false"/>
 
-    <property name="filterField"
-              display-name-key="Filter Field"
-              description-key="Logical name of field to filter by (e.g., ownerid, _ownerid_value). Leave empty for no filtering."
-              of-type="SingleLine.Text"
-              usage="input"
-              required="false"
-              default-value="ownerid"/>
-
-    <property name="filterValue"
-              display-name-key="Filter Value"
-              description-key="Value to filter by. Use {CurrentUser} for current user ID, or leave empty for no filtering."
-              of-type="SingleLine.Text"
-              usage="input"
-              required="false"
-              default-value="{CurrentUser}"/>
-
     <resources>
       <code path="index.ts" order="1"/>
       <platform-library name="React" version="16.14.0" />
