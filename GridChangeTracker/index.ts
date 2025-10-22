@@ -3,6 +3,7 @@ import { GridComponent, IGridProps } from "./components/GridComponent";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import * as React from "react";
 import { convertValueByDataType, getColumnMetadata } from "./utils/typeConverter";
+import { logger, LogTag } from "./utils/logger";
 
 export class GridChangeTracker implements ComponentFramework.ReactControl<IInputs, IOutputs> {
     private notifyOutputChanged: () => void;
@@ -29,13 +30,13 @@ export class GridChangeTracker implements ComponentFramework.ReactControl<IInput
         state: ComponentFramework.Dictionary
     ): void {
         try {
-            console.log('[GridChangeTracker] Starting initialization...');
+            logger.info(LogTag.INIT, 'Starting initialization...');
 
             this.notifyOutputChanged = notifyOutputChanged;
             this.context = context;
 
-            // Comprehensive initialization logging
-            console.log('[GridChangeTracker] Init context:', {
+            // Comprehensive initialization logging with read-only fields
+            logger.debug(LogTag.INIT, 'Init context', {
                 parameters: {
                     gridDataset: {
                         isLoading: context.parameters.gridDataset?.loading,
@@ -56,17 +57,24 @@ export class GridChangeTracker implements ComponentFramework.ReactControl<IInput
                 client: context.client
             });
 
-            // Check for dataset errors
-            if (context.parameters.gridDataset?.error) {
-                console.error('[GridChangeTracker] Dataset error detected:', context.parameters.gridDataset.errorMessage);
+            // Special logging for read-only fields configuration
+            if (context.parameters.readOnlyFields?.raw) {
+                logger.info(LogTag.READONLY, 'Read-only fields configured at initialization', {
+                    rawValue: context.parameters.readOnlyFields.raw,
+                    length: context.parameters.readOnlyFields.raw.length
+                });
             }
 
-            console.log('[GridChangeTracker] Initialization completed successfully');
+            // Check for dataset errors
+            if (context.parameters.gridDataset?.error) {
+                logger.error(LogTag.DATASET, 'Dataset error detected', undefined, {
+                    errorMessage: context.parameters.gridDataset.errorMessage
+                });
+            }
+
+            logger.info(LogTag.INIT, 'Initialization completed successfully');
         } catch (error) {
-            console.error('[GridChangeTracker] CRITICAL: Initialization failed!', error);
-            console.error('[GridChangeTracker] Error details:', {
-                message: error instanceof Error ? error.message : String(error),
-                stack: error instanceof Error ? error.stack : 'No stack trace available',
+            logger.critical('Initialization failed!', error as Error, {
                 context: {
                     hasContext: !!context,
                     hasParameters: !!context?.parameters,
@@ -84,7 +92,7 @@ export class GridChangeTracker implements ComponentFramework.ReactControl<IInput
      */
     public updateView(context: ComponentFramework.Context<IInputs>): React.ReactElement {
         try {
-            console.log('[GridChangeTracker] UpdateView called');
+            logger.debug(LogTag.UPDATE, 'UpdateView called');
 
             this.context = context;
 
@@ -93,7 +101,7 @@ export class GridChangeTracker implements ComponentFramework.ReactControl<IInput
 
             // Comprehensive dataset validation
             if (!dataset) {
-                console.error('[GridChangeTracker] CRITICAL: Dataset is null or undefined!');
+                logger.critical('Dataset is null or undefined!');
                 return React.createElement(
                     'div',
                     { style: { padding: '20px', color: 'red' } },
@@ -103,7 +111,9 @@ export class GridChangeTracker implements ComponentFramework.ReactControl<IInput
 
             // Check for dataset errors
             if (dataset.error) {
-                console.error('[GridChangeTracker] Dataset has error:', dataset.errorMessage);
+                logger.error(LogTag.DATASET, 'Dataset has error', undefined, {
+                    errorMessage: dataset.errorMessage
+                });
                 return React.createElement(
                     'div',
                     { style: { padding: '20px', color: 'red' } },
@@ -126,8 +136,8 @@ export class GridChangeTracker implements ComponentFramework.ReactControl<IInput
                 context: context
             };
 
-            // Detailed update logging
-            console.log('[GridChangeTracker] UpdateView context:', {
+            // Detailed update logging with special focus on read-only fields
+            logger.debug(LogTag.UPDATE, 'UpdateView context', {
                 datasetStatus: {
                     loading: dataset.loading,
                     error: dataset.error,
@@ -145,10 +155,20 @@ export class GridChangeTracker implements ComponentFramework.ReactControl<IInput
                     enableChangeTracking: props.enableChangeTracking,
                     aggregationMode: props.aggregationMode,
                     showChangeIndicator: props.showChangeIndicator,
-                    changedCellColor: props.changedCellColor
+                    changedCellColor: props.changedCellColor,
+                    readOnlyFields: props.readOnlyFields
                 },
                 changedRecordsCount: this.changedRecords.size
             });
+
+            // Special logging for read-only fields on every update
+            if (props.readOnlyFields) {
+                logger.info(LogTag.READONLY, 'Read-only fields in updateView', {
+                    value: props.readOnlyFields,
+                    length: props.readOnlyFields.length,
+                    preview: props.readOnlyFields.substring(0, 100) + (props.readOnlyFields.length > 100 ? '...' : '')
+                });
+            }
 
             // Render React component wrapped in ErrorBoundary
             return React.createElement(

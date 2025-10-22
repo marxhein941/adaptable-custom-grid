@@ -46,8 +46,8 @@
 
     <property name="readOnlyFields"
               display-name-key="Read-Only Fields"
-              description-key="Comma-separated list of field names that should be read-only (e.g., fieldname1,fieldname2)"
-              of-type="SingleLine.Text"
+              description-key="Comma-separated list of field names that should be read-only (e.g., fieldname1,fieldname2). Can use commas or new lines as separators."
+              of-type="Multiple"
               usage="input"
               required="false"
               default-value=""/>

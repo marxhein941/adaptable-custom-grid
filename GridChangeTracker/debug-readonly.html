@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GridChangeTracker - Read-Only Fields Debugger</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f3f2f1;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #323130;
+            border-bottom: 2px solid #0078d4;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #605e5c;
+            margin-top: 30px;
+        }
+        .instructions {
+            background-color: #e1dfdd;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        .debug-controls {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f8f8f8;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #0078d4;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 14px;
+        }
+        button:hover {
+            background-color: #106ebe;
+        }
+        button.secondary {
+            background-color: #605e5c;
+        }
+        button.secondary:hover {
+            background-color: #484644;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+        .status.enabled {
+            background-color: #dff6dd;
+            color: #107c10;
+        }
+        .status.disabled {
+            background-color: #fde7e9;
+            color: #a80000;
+        }
+        .code-block {
+            background-color: #2b2b2b;
+            color: #f8f8f2;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            margin: 10px 0;
+            overflow-x: auto;
+        }
+        .field-list {
+            background: #f3f2f1;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .test-fields {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 10px 0;
+        }
+        .test-field {
+            background: white;
+            border: 1px solid #d2d0ce;
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 GridChangeTracker - Read-Only Fields Debugger</h1>
+
+        <div class="instructions">
+            <h3>📋 Instructions</h3>
+            <p>Use this page to debug read-only field configuration issues in your GridChangeTracker component.</p>
+            <ol>
+                <li>Open this page in the same browser where your Power Apps application is running</li>
+                <li>Enable debug mode using the buttons below</li>
+                <li>Navigate to your Power Apps form with the GridChangeTracker component</li>
+                <li>Open the browser's Developer Console (F12) to see detailed logging</li>
+                <li>Try editing fields that should be read-only to see what's happening</li>
+            </ol>
+        </div>
+
+        <div class="debug-controls">
+            <h2>🛠️ Debug Controls</h2>
+
+            <div id="status" class="status disabled">
+                Debug Mode: DISABLED
+            </div>
+
+            <div>
+                <button onclick="enableDebugMode()">Enable Full Debug Mode</button>
+                <button onclick="enableReadOnlyDebug()">Enable Read-Only Debug Only</button>
+                <button onclick="disableDebugMode()" class="secondary">Disable Debug Mode</button>
+            </div>
+
+            <div style="margin-top: 20px;">
+                <button onclick="clearStorage()">Clear All Debug Settings</button>
+                <button onclick="checkCurrentSettings()">Check Current Settings</button>
+            </div>
+        </div>
+
+        <div class="debug-controls">
+            <h2>🔎 What to Look For in Console</h2>
+
+            <h3>Key Log Tags to Watch:</h3>
+            <div class="code-block">
+[GridChangeTracker][READONLY] - Read-only field configuration logs
+[GridChangeTracker][EDITABLE] - Field editability check results
+[GridChangeTracker][INIT] - Initialization with read-only fields
+[GridChangeTracker][UPDATE] - Update cycle with field configurations
+[GridChangeTracker][RENDER] - Cell rendering decisions
+            </div>
+
+            <h3>Example Read-Only Field Configuration:</h3>
+            <div class="test-fields">
+                <span class="test-field">opalcrm_LastYearActSQM</span>
+                <span class="test-field">opalcrm_LastYearActRatePerSQM</span>
+                <span class="test-field">opalcrm_BudgetSQM</span>
+                <span class="test-field">opalcrm_BudgetRatePerSQM</span>
+                <span class="test-field">opalcrm_BudgetGrossSales</span>
+            </div>
+
+            <h3>Expected Log Pattern for Read-Only Field:</h3>
+            <div class="code-block">
+[GridChangeTracker][READONLY] Read-only fields configured at initialization
+  rawValue: "opalcrm_LastYearActSQM,opalcrm_LastYearActRatePerSQM,..."
+  length: 150
+
+[GridChangeTracker][READONLY] Parsed 5 read-only fields
+  fields: ["opalcrm_LastYearActSQM", "opalcrm_LastYearActRatePerSQM", ...]
+
+[GridChangeTracker][EDITABLE] Field 'opalcrm_LastYearActSQM' editability: false
+  field: opalcrm_LastYearActSQM
+  editable: false
+  reason: Field is in read-only configuration list
+            </div>
+        </div>
+
+        <div class="debug-controls">
+            <h2>⚠️ Common Issues</h2>
+            <ol>
+                <li><strong>Field names don't match:</strong> Check if the field names in your configuration exactly match the column names in the dataset</li>
+                <li><strong>Whitespace issues:</strong> Extra spaces before/after field names can cause matching to fail</li>
+                <li><strong>Case sensitivity:</strong> Field names might be case-sensitive</li>
+                <li><strong>Field not in view:</strong> The field must be present in the grid view for the configuration to apply</li>
+            </ol>
+        </div>
+
+        <div class="debug-controls">
+            <h2>📊 Current Debug Status</h2>
+            <div id="currentSettings" class="field-list">
+                Click "Check Current Settings" to see current configuration...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function enableDebugMode() {
+            localStorage.setItem('gridTrackerDebug', 'true');
+            localStorage.setItem('gridTrackerDebugTags', 'INIT,UPDATE,READONLY,EDITABLE,RENDER,COLUMNS,METADATA');
+            updateStatus();
+            alert('Debug mode enabled! Please refresh your Power Apps page to see detailed logging in the console.');
+        }
+
+        function enableReadOnlyDebug() {
+            localStorage.setItem('gridTrackerDebug', 'true');
+            localStorage.setItem('gridTrackerDebugTags', 'READONLY,EDITABLE');
+            updateStatus();
+            alert('Read-only debug mode enabled! Please refresh your Power Apps page to see read-only field logging.');
+        }
+
+        function disableDebugMode() {
+            localStorage.removeItem('gridTrackerDebug');
+            localStorage.removeItem('gridTrackerDebugTags');
+            updateStatus();
+            alert('Debug mode disabled. Refresh your Power Apps page to apply changes.');
+        }
+
+        function clearStorage() {
+            localStorage.clear();
+            updateStatus();
+            alert('All debug settings cleared!');
+        }
+
+        function checkCurrentSettings() {
+            const debugEnabled = localStorage.getItem('gridTrackerDebug');
+            const debugTags = localStorage.getItem('gridTrackerDebugTags');
+
+            let html = '<strong>Current Settings:</strong><br>';
+            html += `Debug Mode: ${debugEnabled || 'Not set'}<br>`;
+            html += `Debug Tags: ${debugTags || 'All tags'}<br><br>`;
+            html += '<strong>All localStorage items:</strong><br>';
+
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                const value = localStorage.getItem(key);
+                html += `${key}: ${value}<br>`;
+            }
+
+            document.getElementById('currentSettings').innerHTML = html;
+        }
+
+        function updateStatus() {
+            const debugEnabled = localStorage.getItem('gridTrackerDebug') === 'true';
+            const statusEl = document.getElementById('status');
+
+            if (debugEnabled) {
+                statusEl.className = 'status enabled';
+                statusEl.textContent = 'Debug Mode: ENABLED';
+            } else {
+                statusEl.className = 'status disabled';
+                statusEl.textContent = 'Debug Mode: DISABLED';
+            }
+        }
+
+        // Check status on load
+        updateStatus();
+
+        // Also log to this page's console
+        console.log('%c🔍 GridChangeTracker Debug Page Loaded', 'color: #0078d4; font-size: 16px; font-weight: bold;');
+        console.log('Use the buttons above to enable debug mode for your GridChangeTracker component.');
+    </script>
+</body>
+</html>

@@ -340,71 +340,71 @@ export class KeyboardShortcutManager {
     // Navigation actions (to be implemented by the grid)
     private navigate(direction: string, edit?: boolean): void {
         // This will be overridden by the grid implementation
-        console.log(`Navigate ${direction}${edit ? ' and edit' : ''}`);
+        // Removed verbose logging - keyboard navigation is too frequent
     }
 
     private selectAll(): void {
-        console.log('Select all');
+        // Action implementation
     }
 
     private selectRow(): void {
-        console.log('Select row');
+        // Action implementation
     }
 
     private selectColumn(): void {
-        console.log('Select column');
+        // Action implementation
     }
 
     private editCell(): void {
-        console.log('Edit cell');
+        // Action implementation
     }
 
     private clearCell(): void {
-        console.log('Clear cell');
+        // Action implementation
     }
 
     private clearAndEdit(): void {
-        console.log('Clear and edit');
+        // Action implementation
     }
 
     private copy(): void {
-        console.log('Copy');
+        // Action implementation
     }
 
     private cut(): void {
-        console.log('Cut');
+        // Action implementation
     }
 
     private paste(): void {
-        console.log('Paste');
+        // Action implementation
     }
 
     private undo(): void {
-        console.log('Undo');
+        // Action implementation
     }
 
     private redo(): void {
-        console.log('Redo');
+        // Action implementation
     }
 
     private find(): void {
-        console.log('Find');
+        // Action implementation
     }
 
     private replace(): void {
-        console.log('Replace');
+        // Action implementation
     }
 
     private save(): void {
-        console.log('Save');
+        // Action implementation
     }
 
     private fillDown(): void {
-        console.log('Fill down');
+        // Action implementation
     }
 
     private fillRight(): void {
-        console.log('Fill right');
+        // Action implementation
     }
 
     /**

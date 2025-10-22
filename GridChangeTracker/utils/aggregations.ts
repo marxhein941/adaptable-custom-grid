@@ -34,6 +34,14 @@ export function calculateAggregations(
 
     columns.forEach(column => {
         const columnName = column.name;
+
+        // First check if the column contains alphabetic characters
+        // Skip aggregation for columns with text data like "01-Jan", "02-Feb"
+        if (!isColumnAggregatable(data, columnName)) {
+            console.log(`[Aggregations] Skipping column '${columnName}' - contains alphabetic characters`);
+            return;
+        }
+
         const values = extractNumericValues(data, columnName);
 
         if (values.length > 0) {
@@ -65,6 +73,47 @@ export function calculateAggregations(
 }
 
 /**
+ * Check if a value contains alphabetic characters
+ */
+function containsAlphabeticCharacters(value: any): boolean {
+    if (value == null) {
+        return false;
+    }
+
+    // Convert to string and check for alphabetic characters
+    const stringValue = String(value);
+    // This regex checks if the string contains any letter (a-z, A-Z)
+    return /[a-zA-Z]/.test(stringValue);
+}
+
+/**
+ * Check if a column should be aggregated
+ * Returns false if any value in the column contains alphabetic characters
+ */
+function isColumnAggregatable(data: any[], columnName: string): boolean {
+    if (!data || data.length === 0) {
+        return false;
+    }
+
+    // Sample the first few rows to check for alphabetic characters
+    // We'll check up to 10 rows for performance
+    const sampleSize = Math.min(10, data.length);
+
+    for (let i = 0; i < sampleSize; i++) {
+        // Check both raw and display values
+        const rawValue = data[i][`${columnName}_raw`];
+        const displayValue = data[i][columnName];
+
+        // If either value contains alphabetic characters, don't aggregate this column
+        if (containsAlphabeticCharacters(rawValue) || containsAlphabeticCharacters(displayValue)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+/**
  * Extract numeric values from a column
  */
 function extractNumericValues(data: any[], columnName: string): number[] {
@@ -81,6 +130,11 @@ function extractNumericValues(data: any[], columnName: string): number[] {
         }
 
         if (value != null) {
+            // Skip values that contain alphabetic characters
+            if (containsAlphabeticCharacters(value)) {
+                return;
+            }
+
             // Try to convert to number
             const numValue = typeof value === 'number' ? value : parseFloat(value);
 
@@ -200,6 +254,11 @@ export function isNumericColumn(data: any[], columnName: string): boolean {
         }
 
         if (value != null) {
+            // Check if value contains alphabetic characters
+            if (containsAlphabeticCharacters(value)) {
+                return false;
+            }
+
             const numValue = typeof value === 'number' ? value : parseFloat(value);
             if (!isNaN(numValue) && isFinite(numValue)) {
                 numericCount++;

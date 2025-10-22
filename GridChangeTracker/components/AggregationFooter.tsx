@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { IColumn } from '@fluentui/react/lib/DetailsList';
 import { AggregationResult, AggregationMode, getAggregationModeName } from '../utils/aggregations';
+import { isNumericType } from '../utils/typeConverter';
 
 export interface IAggregationFooterProps {
     aggregations: AggregationResult;
@@ -78,6 +79,10 @@ export const AggregationFooter: React.FC<IAggregationFooterProps> = (props) => {
                     const gridColumn = gridColumns.find(gc => gc.key === column.name);
                     const columnWidth = gridColumn?.currentWidth ?? gridColumn?.minWidth ?? 150;
 
+                    // Check if column is numeric for alignment
+                    const columnMetadata = column as any;
+                    const isNumeric = isNumericType(columnMetadata.dataType);
+
                     return (
                         <div
                             key={column.name}
@@ -85,7 +90,11 @@ export const AggregationFooter: React.FC<IAggregationFooterProps> = (props) => {
                             style={{
                                 width: `${columnWidth}px`,
                                 minWidth: `${columnWidth}px`,
-                                maxWidth: `${columnWidth}px`
+                                maxWidth: `${columnWidth}px`,
+                                textAlign: isNumeric ? 'right' : 'left',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: isNumeric ? 'flex-end' : 'flex-start'
                             }}
                         >
                             {aggregation ? (

@@ -404,22 +404,31 @@
 
 /* Read-only cell styling */
 .readonly-cell {
-    background-color: #f3f2f1;
-    cursor: not-allowed;
-    user-select: none;
+    background-color: #f3f2f1 !important;
+    cursor: not-allowed !important;
+    user-select: none !important;
+    pointer-events: auto !important;
 }
 
 .readonly-cell:hover {
-    background-color: #edebe9;
+    background-color: #edebe9 !important;
+}
+
+.readonly-cell * {
+    pointer-events: none !important;
+    cursor: not-allowed !important;
+    user-select: none !important;
 }
 
 .readonly-text {
     display: inline-block;
     width: 100%;
     padding: 6px 8px;
-    color: #605e5c;
+    color: #605e5c !important;
     font-size: 14px;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-style: italic !important;
+    pointer-events: none !important;
 }
 
 /* Enhanced focus styles for selected/editing cell */

@@ -14,7 +14,8 @@ import { BUILD_TIMESTAMP } from '../buildConstants';
 import { debounce } from '../utils/debounce';
 import { throttle } from '../utils/throttle';
 import { getColumnDescriptions, defaultColumnDescriptions } from '../utils/metadataConfig';
-import { convertValueByDataType, getColumnMetadata, isFieldEditableByType } from '../utils/typeConverter';
+import { convertValueByDataType, getColumnMetadata, isFieldEditableByType, isNumericType } from '../utils/typeConverter';
+import { logger, LogTag, logReadOnlyDebug, logEditability } from '../utils/logger';
 
 export interface IGridProps {
     dataset: ComponentFramework.PropertyTypes.DataSet;
@@ -84,6 +85,15 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
     }
 
     componentDidMount(): void {
+        // Log all available columns for debugging
+        logger.debug(LogTag.COLUMNS, 'Available columns in dataset', {
+            columns: this.props.dataset.columns.map(col => ({
+                name: col.name,
+                displayName: col.displayName,
+                alias: col.alias
+            }))
+        });
+
         // Set page size to maximum to load all records at once
         const needsRefresh = this.setMaxPageSize();
 
@@ -120,11 +130,11 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
     private setMaxPageSize(): boolean {
         const dataset = this.props.dataset;
 
-        console.log('[GridComponent] setMaxPageSize() called, pageSizeSet flag:', this.pageSizeSet);
+        logger.debug(LogTag.PAGING, 'setMaxPageSize() called', { pageSizeSet: this.pageSizeSet });
 
         // Only set page size once to avoid infinite loops
         if (this.pageSizeSet) {
-            console.log('[GridComponent] Page size already set, skipping');
+            logger.debug(LogTag.PAGING, 'Page size already set, skipping');
             return false;
         }
 
@@ -133,30 +143,34 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
             const currentPageSize = dataset.paging.pageSize;
             const totalCount = dataset.paging.totalResultCount;
 
-            console.log(`[GridComponent] Paging info - Current pageSize: ${currentPageSize}, Total records: ${totalCount}, hasNextPage: ${dataset.paging.hasNextPage}`);
+            logger.info(LogTag.PAGING, 'Paging info', {
+                currentPageSize,
+                totalRecords: totalCount,
+                hasNextPage: dataset.paging.hasNextPage
+            });
 
             // Set page size to 5000 (maximum allowed by Dataverse)
             // This will load all records up to 5000 in a single page
             if (currentPageSize < 5000) {
-                console.log(`[GridComponent] Setting page size from ${currentPageSize} to 5000`);
+                logger.info(LogTag.PAGING, `Setting page size from ${currentPageSize} to 5000`);
                 dataset.paging.setPageSize(5000);
-                console.log(`[GridComponent] Page size after setting: ${dataset.paging.pageSize}`);
+                logger.debug(LogTag.PAGING, 'Page size after setting', { pageSize: dataset.paging.pageSize });
 
                 // Mark that we've set the page size
                 this.pageSizeSet = true;
 
                 // Refresh the dataset to load all records with the new page size
-                console.log(`[GridComponent] Calling dataset.refresh() to reload with new page size`);
+                logger.info(LogTag.PAGING, 'Calling dataset.refresh() to reload with new page size');
                 dataset.refresh();
 
                 // Return true to indicate we triggered a refresh
                 return true;
             } else {
-                console.log(`[GridComponent] Page size already at maximum (${currentPageSize})`);
+                logger.debug(LogTag.PAGING, `Page size already at maximum: ${currentPageSize}`);
                 this.pageSizeSet = true;
             }
         } else {
-            console.warn('[GridComponent] Cannot set page size - paging not available!', {
+            logger.warn(LogTag.PAGING, 'Cannot set page size - paging not available', {
                 hasDataset: !!dataset,
                 hasPaging: !!(dataset && dataset.paging)
             });
@@ -207,34 +221,80 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
 
     private parseReadOnlyFields(readOnlyFieldsString: string): Set<string> {
         if (!readOnlyFieldsString || readOnlyFieldsString.trim() === '') {
+            logReadOnlyDebug('No read-only fields configured');
             return new Set<string>();
         }
 
-        // Split by comma and trim whitespace
+        logReadOnlyDebug('Raw read-only fields input', {
+            raw: readOnlyFieldsString,
+            length: readOnlyFieldsString.length
+        });
+
+        // Split by comma or newline to support both formats
+        // This allows for longer lists using the Multiple text field type
+        // IMPORTANT: Convert to lowercase for case-insensitive matching
         const fields = readOnlyFieldsString
-            .split(',')
-            .map(field => field.trim())
+            .split(/[,\n\r]+/) // Split by comma, newline, or carriage return
+            .map(field => field.trim().toLowerCase()) // Convert to lowercase for case-insensitive matching
             .filter(field => field.length > 0);
+
+        logger.info(LogTag.READONLY, `Parsed ${fields.length} read-only fields (case-insensitive)`, {
+            originalFields: readOnlyFieldsString.split(/[,\n\r]+/).map(f => f.trim()).filter(f => f.length > 0),
+            normalizedFields: fields,
+            // Log each field with character codes to debug hidden characters
+            fieldsDebug: fields.map(f => ({ field: f, length: f.length, charCodes: f.split('').map(c => c.charCodeAt(0)) }))
+        });
 
         return new Set<string>(fields);
     }
 
     private isFieldEditable(columnName: string): boolean {
-        // Check if field is in the read-only configuration
-        if (this.state.readOnlyFieldsSet.has(columnName)) {
-            console.log(`[GridComponent] Field ${columnName} is in read-only configuration`);
+        // CASE-INSENSITIVE: Compare using lowercase
+        const columnNameLower = columnName.toLowerCase();
+        const isInReadOnlySet = this.state.readOnlyFieldsSet.has(columnNameLower);
+        const readOnlyArray = Array.from(this.state.readOnlyFieldsSet);
+
+        // Log at INFO level first to ensure we see it
+        logger.info(LogTag.EDITABLE, `Checking editability for field: "${columnName}" (normalized: "${columnNameLower}")`, {
+            originalColumnName: columnName,
+            normalizedColumnName: columnNameLower,
+            readOnlyFieldsSet: readOnlyArray,
+            fieldIsInSet: isInReadOnlySet,
+            // Add exact match debugging
+            exactMatches: readOnlyArray.map(f => ({
+                field: f,
+                matches: f === columnNameLower,
+                fieldLength: f.length,
+                columnLength: columnNameLower.length
+            }))
+        });
+
+        // Comprehensive debugging for read-only field checking
+        logReadOnlyDebug(`Checking editability for field: "${columnName}"`, {
+            originalColumnName: columnName,
+            normalizedColumnName: columnNameLower,
+            readOnlyFieldsArray: readOnlyArray,
+            fieldIsInSet: isInReadOnlySet,
+            setSize: this.state.readOnlyFieldsSet.size
+        });
+
+        // Check if field is in the read-only configuration - MOST IMPORTANT CHECK
+        if (isInReadOnlySet) {
+            logEditability(columnName, false, 'Field is in read-only configuration list');
+            logger.error(LogTag.READONLY, `!!!FIELD SHOULD BE READ-ONLY!!!: "${columnName}"`);
             return false;
         }
 
         // Check column metadata for any indicators
         const column = this.props.dataset.columns.find(col => col.name === columnName);
         if (!column) {
+            logEditability(columnName, false, 'Column not found in dataset');
             return false;
         }
 
         // Check if column is the primary field (usually read-only)
         if (column.isPrimary) {
-            console.log(`[GridComponent] Field ${columnName} is primary field - not editable`);
+            logEditability(columnName, false, 'Field is primary key');
             return false;
         }
 
@@ -243,13 +303,13 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
         if (realMetadata) {
             // Use the authoritative IsValidForUpdate from the server
             if (realMetadata.isValidForUpdate === false) {
-                console.log(`[GridComponent] Field ${columnName} is not valid for update (from server metadata: IsValidForUpdate=false)`);
+                logEditability(columnName, false, 'Server metadata: IsValidForUpdate=false');
                 return false;
             }
 
             // Check if it's a Virtual attribute type (from server metadata)
             if (realMetadata.attributeType === 'Virtual') {
-                console.log(`[GridComponent] Field ${columnName} is virtual/computed field (from server metadata)`);
+                logEditability(columnName, false, 'Server metadata: Virtual attribute type');
                 return false;
             }
         }
@@ -257,6 +317,7 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
         // FALLBACK: Get column metadata from PCF dataset (less reliable)
         const columnMetadata = getColumnMetadata(this.props.dataset, columnName);
         if (!columnMetadata) {
+            logEditability(columnName, false, 'No column metadata available');
             return false;
         }
 
@@ -264,13 +325,13 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
         if (!realMetadata) {
             // Check if field is marked as not valid for update (from PCF dataset - may be incomplete)
             if (columnMetadata.isValidForUpdate === false) {
-                console.log(`[GridComponent] Field ${columnName} is not valid for update (from PCF dataset)`);
+                logEditability(columnName, false, 'PCF dataset: IsValidForUpdate=false');
                 return false;
             }
 
             // Check if it's a virtual field (from PCF dataset)
             if (columnMetadata.isVirtualField) {
-                console.log(`[GridComponent] Field ${columnName} is virtual/computed field - not editable`);
+                logEditability(columnName, false, 'PCF dataset: Virtual field');
                 return false;
             }
         }
@@ -278,18 +339,19 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
         // Check if it's a name field (logical representation of lookup fields)
         // These end with "name" or "yominame" and are display-only
         if (columnMetadata.isNameField) {
-            console.log(`[GridComponent] Field ${columnName} is a name field (logical/display-only) - not editable`);
+            logEditability(columnName, false, 'Name field (logical/display-only)');
             return false;
         }
 
         // Check if this field type can be edited in a grid context
         const dataType = columnMetadata.dataType;
         if (!isFieldEditableByType(dataType)) {
-            console.log(`[GridComponent] Field ${columnName} with type ${dataType} is not editable in grid`);
+            logEditability(columnName, false, `Field type ${dataType} not editable in grid`);
             return false;
         }
 
         // Default to editable
+        logEditability(columnName, true, 'Field passed all checks');
         return true;
     }
 
@@ -297,11 +359,11 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
         try {
             const entityType = this.props.dataset.getTargetEntityType();
             if (!entityType) {
-                console.warn('[GridComponent] Unable to load entity metadata: No entity type available');
+                logger.warn(LogTag.METADATA, 'Unable to load entity metadata: No entity type available');
                 return;
             }
 
-            console.log(`[GridComponent] Loading entity metadata for: ${entityType}`);
+            logger.info(LogTag.METADATA, `Loading entity metadata for: ${entityType}`);
 
             // Try to get the client URL from Xrm context
             // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
@@ -844,9 +906,22 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
 
                         const hasTooltip = typeof tooltipText === 'string' && tooltipText.trim().length > 0;
 
+                        // Check if column is numeric for alignment
+                        const columnMetadata = getColumnMetadata(this.props.dataset, columnName);
+                        const isNumeric = isNumericType(columnMetadata?.dataType);
+
                         const headerContent = (
-                            <React.Fragment>
-                                <span className="column-name">{headerText}</span>
+                            <div style={{
+                                display: 'flex',
+                                justifyContent: isNumeric ? 'flex-end' : 'flex-start',
+                                alignItems: 'center',
+                                width: '100%',
+                                paddingRight: isNumeric ? '8px' : '0',
+                                paddingLeft: isNumeric ? '0' : '8px'
+                            }}>
+                                <span className="column-name">
+                                    {headerText}
+                                </span>
                                 {hasTooltip && (
                                     <Icon
                                         iconName="Info"
@@ -862,7 +937,7 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
                                         }}
                                     />
                                 )}
-                            </React.Fragment>
+                            </div>
                         );
 
                         return (
@@ -942,14 +1017,50 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
     }
 
     private renderCell = (item: any, columnName: string): JSX.Element => {
+        // Debug: Log the actual column name being rendered
+        // Enhanced logging for read-only debugging
+        logger.debug(LogTag.RENDER, `Rendering cell for column: "${columnName}"`, {
+            recordId: item.id,
+            columnName
+        });
+
         const isChanged = this.changeTracker.isCellChanged(item.id, columnName);
         const value = item[columnName] || '';
         const isEditable = this.isFieldEditable(columnName);
+
+        // CRITICAL: Log rendering decision for read-only fields (CASE-INSENSITIVE)
+        if (this.state.readOnlyFieldsSet.has(columnName.toLowerCase())) {
+            logger.error(LogTag.RENDER, `RENDERING READ-ONLY FIELD: "${columnName}"`, undefined, {
+                columnName,
+                normalizedColumnName: columnName.toLowerCase(),
+                isEditable,
+                isInReadOnlySet: true,
+                willRenderAsSpan: !isEditable,
+                value
+            });
+        }
+
+        // Critical logging for read-only field debugging - using both tags for visibility (CASE-INSENSITIVE)
+        logEditability(columnName, isEditable,
+            !isEditable && this.state.readOnlyFieldsSet.has(columnName.toLowerCase())
+                ? 'Field is in read-only configuration list'
+                : 'Other reason');
+
+        // Also log with READONLY tag for completeness (CASE-INSENSITIVE)
+        logReadOnlyDebug(`Column "${columnName}" editability result`, {
+            columnName,
+            normalizedColumnName: columnName.toLowerCase(),
+            isEditable,
+            isInReadOnlySet: this.state.readOnlyFieldsSet.has(columnName.toLowerCase()),
+            readOnlySetSize: this.state.readOnlyFieldsSet.size
+        });
+
         const column = this.props.dataset.columns.find(col => col.name === columnName);
         const displayName = column?.displayName || columnName;
 
         // Get metadata to determine WHY field is not editable (for better UX)
         const columnMetadata = getColumnMetadata(this.props.dataset, columnName);
+        const isNumeric = isNumericType(columnMetadata?.dataType);
         let readOnlyReason = '';
         if (!isEditable) {
             if (column?.isPrimary) {
@@ -967,43 +1078,88 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
             }
         }
 
+        // CRITICAL: Double-check editability right before rendering (CASE-INSENSITIVE)
+        // This ensures we catch any race conditions or state inconsistencies
+        const finalIsEditable = isEditable && !this.state.readOnlyFieldsSet.has(columnName.toLowerCase());
+
         const cellStyle: React.CSSProperties = {
             backgroundColor: isChanged && this.props.enableChangeTracking
                 ? this.props.changedCellColor
-                : isEditable ? 'transparent' : '#f3f2f1',
+                : finalIsEditable ? 'transparent' : '#f3f2f1',
             padding: '8px 12px',
             transition: 'all 0.2s ease-in-out',
-            cursor: isEditable ? 'text' : 'not-allowed',
-            opacity: isEditable ? 1 : 0.7,
+            cursor: finalIsEditable ? 'text' : 'not-allowed',
+            opacity: finalIsEditable ? 1 : 0.7,
             width: '100%',
             height: '100%',
             boxSizing: 'border-box',
             display: 'flex',
-            alignItems: 'center'
+            alignItems: 'center',
+            justifyContent: isNumeric ? 'flex-end' : 'flex-start',
+            textAlign: isNumeric ? 'right' : 'left'
         };
 
-        const cellClassName = isEditable
+        const cellClassName = finalIsEditable
             ? (isChanged ? 'changed-cell' : 'editable-cell')
             : 'readonly-cell';
 
-        const ariaLabel = isEditable
+        const ariaLabel = finalIsEditable
             ? `Edit ${displayName} for record ${item.id}${isChanged ? ' (modified)' : ''}`
             : `${displayName}: ${value} (read-only: ${readOnlyReason})`;
 
+        if (!finalIsEditable && isEditable) {
+            logger.error(LogTag.READONLY, `SAFETY CHECK: Field "${columnName}" was marked editable but is in read-only set. Forcing to read-only.`);
+        }
+
+        // Handler to prevent interaction with read-only cells
+        const handleCellClick = (e: React.MouseEvent) => {
+            if (!finalIsEditable) {
+                e.preventDefault();
+                e.stopPropagation();
+                logger.warn(LogTag.READONLY, `Blocked click on read-only field: "${columnName}"`);
+            }
+        };
+
+        const handleCellFocus = (e: React.FocusEvent) => {
+            if (!finalIsEditable) {
+                e.preventDefault();
+                e.stopPropagation();
+                (e.target as HTMLElement).blur();
+                logger.warn(LogTag.READONLY, `Blocked focus on read-only field: "${columnName}"`);
+            }
+        };
+
         return (
-            <div style={cellStyle} className={cellClassName} tabIndex={-1} role="gridcell" aria-label={ariaLabel}>
+            <div
+                style={cellStyle}
+                className={cellClassName}
+                tabIndex={finalIsEditable ? 0 : -1}
+                role="gridcell"
+                aria-label={ariaLabel}
+                onClick={handleCellClick}
+                onFocus={handleCellFocus}
+            >
                 {this.props.enableChangeTracking && this.props.showChangeIndicator && isChanged && (
                     <span className="change-indicator" aria-label="Modified">*</span>
                 )}
-                {isEditable ? (
+                {finalIsEditable ? (
                     <TextField
                         value={value}
                         onChange={(e, newValue) => this.handleCellChange(item.id, columnName, newValue)}
+                        readOnly={false}
+                        disabled={false}
                         borderless
                         ariaLabel={`Edit ${displayName}`}
                         styles={{
                             root: { display: 'inline-block', width: '100%' },
-                            fieldGroup: { border: 'none', background: 'transparent' }
+                            fieldGroup: {
+                                border: 'none',
+                                background: 'transparent',
+                                textAlign: isNumeric ? 'right' : 'left'
+                            },
+                            field: {
+                                textAlign: isNumeric ? 'right' : 'left'
+                            }
                         }}
                     />
                 ) : (
@@ -1011,7 +1167,13 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
                         className="readonly-text"
                         title={`This field is read-only: ${readOnlyReason}`}
                         role="text"
-                        style={{ color: '#605e5c', fontStyle: 'italic' }}
+                        style={{
+                            color: '#605e5c',
+                            fontStyle: 'italic',
+                            textAlign: isNumeric ? 'right' : 'left',
+                            width: '100%',
+                            display: 'block'
+                        }}
                     >
                         {value}
                     </span>
@@ -1021,6 +1183,30 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
     }
 
     private handleCellChange = (recordId: string, columnName: string, newValue: any): void => {
+        // CRITICAL CHECK: Prevent changes to read-only fields at the handler level (CASE-INSENSITIVE)
+        if (this.state.readOnlyFieldsSet.has(columnName.toLowerCase())) {
+            logger.error(LogTag.READONLY, `Attempted to edit read-only field: "${columnName}". Change blocked.`, undefined, {
+                recordId,
+                columnName,
+                normalizedColumnName: columnName.toLowerCase(),
+                attemptedValue: newValue
+            });
+            // Do not process the change
+            return;
+        }
+
+        // Additional check: Verify field is editable
+        if (!this.isFieldEditable(columnName)) {
+            logger.error(LogTag.READONLY, `Attempted to edit non-editable field: "${columnName}". Change blocked.`, undefined, {
+                recordId,
+                columnName,
+                normalizedColumnName: columnName.toLowerCase(),
+                attemptedValue: newValue
+            });
+            // Do not process the change
+            return;
+        }
+
         // Get column metadata to determine the proper data type
         const columnMetadata = getColumnMetadata(this.props.dataset, columnName);
         const dataType = columnMetadata?.dataType;

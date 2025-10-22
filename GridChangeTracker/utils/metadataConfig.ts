@@ -32,7 +32,7 @@ interface EntityMetadata {
 // Import the metadata JSON directly
 // You can update this with the actual metadata from your CRM system
 export const entityMetadata: EntityMetadata = {
-    "@odata.context": "https://d365-salesandcustomerservice-dev.crm6.dynamics.com/api/data/v9.2/$metadata#EntityDefinitions(LogicalName,Attributes(LogicalName,DisplayName,Description))/$entity",
+    "@odata.context": "$metadata#EntityDefinitions(LogicalName,Attributes(LogicalName,DisplayName,Description))/$entity",
     "MetadataId": "8f31eabd-8914-ef11-840a-000d3ad2b065",
     "LogicalName": "opalcrm_manufacturedsalesforecastingtotal",
     "Attributes": [
