@@ -89,7 +89,7 @@
     top: 0;
     z-index: 100;
     background-color: #f3f2f1;
-    border-bottom: 1px solid #edebe9;
+    border-bottom: 2px solid #323130;
     overflow-x: auto;
     overflow-y: hidden;
 }
@@ -116,7 +116,7 @@
     flex-shrink: 0;
     flex-grow: 0;
     box-sizing: border-box;
-    border-right: 1px solid #edebe9;
+    border-right: 1px solid #c8c6c4;
     font-weight: 600;
     font-size: 14px;
     color: #323130;
@@ -151,7 +151,7 @@
     flex-shrink: 0;
     flex-grow: 0;
     box-sizing: border-box;
-    border-right: 1px solid #edebe9;
+    border-right: 1px solid #c8c6c4;
 }
 
 .custom-filter-cell:last-child {
@@ -176,7 +176,7 @@
     flex-direction: row;
     min-width: fit-content;
     width: max-content;
-    border-bottom: 1px solid #edebe9;
+    border-bottom: 1px solid #c8c6c4;
 }
 
 .custom-data-row:hover {
@@ -189,7 +189,7 @@
     flex-shrink: 0;
     flex-grow: 0;
     box-sizing: border-box;
-    border-right: 1px solid #edebe9;
+    border-right: 1px solid #c8c6c4;
 }
 
 .custom-data-cell:last-child {
@@ -289,7 +289,7 @@
     flex-shrink: 0;
     flex-grow: 0;
     box-sizing: border-box;
-    border-right: 1px solid #edebe9;
+    border-right: 1px solid #c8c6c4;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -603,30 +603,25 @@
     text-overflow: ellipsis;
 }
 
-/* Row-level disabled state styling */
+/* Row-level disabled state styling - matches disabled column styling */
 .custom-data-row.row-disabled {
-    opacity: 0.65;
-    background-color: #fafafa !important;
+    background-color: #f3f2f1 !important;
 }
 
 .custom-data-row.row-disabled:hover {
-    background-color: #f5f5f5 !important;
+    background-color: #edebe9 !important;
 }
 
 .custom-data-row.row-disabled .custom-data-cell {
-    background-color: transparent !important;
+    background-color: #f3f2f1 !important;
 }
 
 /* Enhanced visual indicator for row-level disabled cells */
 .custom-data-row.row-disabled .readonly-cell {
-    background-color: #fafafa !important;
-    border-left: 3px solid #d13438;
-}
-
-.custom-data-row.row-disabled .readonly-cell:first-child {
-    border-left: 3px solid #d13438;
+    background-color: #f3f2f1 !important;
 }
 
 .custom-data-row.row-disabled .readonly-text {
-    color: #8a8886 !important;
+    color: #605e5c !important;
+    font-style: italic !important;
 }
