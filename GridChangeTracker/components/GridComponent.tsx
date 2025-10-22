@@ -69,8 +69,8 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
             this.props.onCellChange(recordId, columnName, value);
         }, 300);
 
-        // Throttle column resize to improve performance (~60fps)
-        this.throttledColumnResize = throttle(this.handleColumnResize.bind(this), 16);
+        // Direct column resize without throttling for responsive resizing
+        this.throttledColumnResize = this.handleColumnResize.bind(this);
 
         this.state = {
             currentData: [],
@@ -833,9 +833,9 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
         const { sortColumn, isSortDescending, columns: stateColumns, columnWidths, currentData } = this.state;
 
         // Column width constants
-        const DEFAULT_COLUMN_WIDTH = 150;
-        const MIN_COLUMN_WIDTH = 50;
-        const MAX_COLUMN_WIDTH = 400;
+        const DEFAULT_COLUMN_WIDTH = 180;  // Increased by 20% from 150
+        const MIN_COLUMN_WIDTH = 60;       // Increased by 20% from 50
+        const MAX_COLUMN_WIDTH = 480;      // Increased by 20% from 400
 
         // Filter out the primary column (isPrimary property)
         const visibleColumns = this.props.dataset.columns.filter(col => {

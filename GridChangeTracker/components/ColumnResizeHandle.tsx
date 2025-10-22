@@ -17,9 +17,9 @@ export const ColumnResizeHandle: React.FC<IColumnResizeHandleProps> = ({ columnK
         startX.current = e.clientX;
 
         const handleMouseMove = (e: MouseEvent) => {
-            if (!isResizing && startX.current === 0) return;
             const deltaX = e.clientX - startX.current;
-            if (Math.abs(deltaX) > 0) {
+            // Update on every movement for smooth, responsive resizing
+            if (deltaX !== 0) {
                 onResize(columnKey, deltaX);
                 startX.current = e.clientX;
             }
