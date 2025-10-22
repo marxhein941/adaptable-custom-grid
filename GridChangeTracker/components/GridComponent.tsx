@@ -25,6 +25,9 @@ export interface IGridProps {
     showChangeIndicator: boolean;
     readOnlyFields: string;
     useDescriptionAsColumnName: boolean;
+    // Row-level enable configuration
+    enableRowsField?: string;      // Column to check for row-level control
+    enableRowsValue?: string;      // Value that enables editing
     onCellChange: (recordId: string, columnName: string, value: any) => void;
     onSave: () => Promise<void>;
     // Add context to access WebAPI
@@ -248,7 +251,74 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
         return new Set<string>(fields);
     }
 
-    private isFieldEditable(columnName: string): boolean {
+    /**
+     * Determines if a row is editable based on enableRowsField configuration
+     * @param item The row data object containing all column values
+     * @returns true if row should be editable, false if entire row should be read-only
+     */
+    private isRowEditable(item: any): boolean {
+        // If no row-level configuration, all rows are editable by default
+        if (!this.props.enableRowsField || !this.props.enableRowsValue) {
+            return true;
+        }
+
+        const fieldNameInput = this.props.enableRowsField.trim();
+        const expectedValue = this.props.enableRowsValue.trim();
+
+        // CASE-INSENSITIVE: Find the field in the item using case-insensitive matching
+        const itemKeys = Object.keys(item);
+        const matchedKey = itemKeys.find(key => key.toLowerCase() === fieldNameInput.toLowerCase());
+
+        // Check if the field exists in the row data
+        if (!matchedKey) {
+            logger.warn(LogTag.EDITABLE,
+                `Enable rows field "${fieldNameInput}" not found in row data. Row will be read-only.`,
+                {
+                    recordId: item.id,
+                    availableFields: itemKeys.filter(k => !k.endsWith('_raw'))
+                }
+            );
+            return false;
+        }
+
+        const actualValue = item[matchedKey];
+
+        // Case-insensitive comparison for string values
+        const matches = String(actualValue).toLowerCase().trim() ===
+                        expectedValue.toLowerCase();
+
+        logger.debug(LogTag.EDITABLE,
+            `Row editability check for record ${item.id}`,
+            {
+                fieldNameInput,
+                matchedFieldName: matchedKey,
+                expectedValue,
+                actualValue,
+                matches,
+                rowIsEditable: matches
+            }
+        );
+
+        return matches;
+    }
+
+    private isFieldEditable(columnName: string, item?: any): boolean {
+        // FIRST: Check if the entire row is editable (row-level control)
+        if (item && !this.isRowEditable(item)) {
+            // CASE-INSENSITIVE: Find the actual field name in the item
+            let actualValue = 'N/A';
+            if (this.props.enableRowsField) {
+                const itemKeys = Object.keys(item);
+                const fieldNameLower = this.props.enableRowsField.trim().toLowerCase();
+                const matchedKey = itemKeys.find(key => key.toLowerCase() === fieldNameLower);
+                actualValue = matchedKey ? item[matchedKey] : 'N/A';
+            }
+            logEditability(columnName, false,
+                `Row disabled: ${this.props.enableRowsField} = '${actualValue}' (expected '${this.props.enableRowsValue}')`
+            );
+            return false;
+        }
+
         // CASE-INSENSITIVE: Compare using lowercase
         const columnNameLower = columnName.toLowerCase();
         const isInReadOnlySet = this.state.readOnlyFieldsSet.has(columnNameLower);
@@ -1007,26 +1077,48 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
 
         return (
             <div className="custom-data-rows">
-                {currentData.map((item, rowIndex) => (
-                    <div key={item.id || rowIndex} className="custom-data-row">
-                        {columns.map(col => {
-                            const columnName = col.key;
-                            return (
-                                <div
-                                    key={`${item.id}-${columnName}`}
-                                    className="custom-data-cell"
-                                    style={{
-                                        width: col.currentWidth || col.minWidth,
-                                        minWidth: col.minWidth,
-                                        maxWidth: col.maxWidth
-                                    }}
-                                >
-                                    {this.renderCell(item, columnName)}
-                                </div>
-                            );
-                        })}
-                    </div>
-                ))}
+                {currentData.map((item, rowIndex) => {
+                    const isRowDisabled = !this.isRowEditable(item);
+                    const rowClassName = `custom-data-row${isRowDisabled ? ' row-disabled' : ''}`;
+
+                    // CASE-INSENSITIVE: Get the actual value for the tooltip
+                    let actualFieldValue = 'N/A';
+                    if (isRowDisabled && this.props.enableRowsField) {
+                        const itemKeys = Object.keys(item);
+                        const fieldNameLower = this.props.enableRowsField.trim().toLowerCase();
+                        const matchedKey = itemKeys.find(key => key.toLowerCase() === fieldNameLower);
+                        actualFieldValue = matchedKey ? item[matchedKey] : 'N/A';
+                    }
+
+                    const rowTitle = isRowDisabled && this.props.enableRowsField && this.props.enableRowsValue
+                        ? `This row is read-only because ${this.props.enableRowsField} = '${actualFieldValue}' (only '${this.props.enableRowsValue}' rows are editable)`
+                        : undefined;
+
+                    return (
+                        <div
+                            key={item.id || rowIndex}
+                            className={rowClassName}
+                            title={rowTitle}
+                        >
+                            {columns.map(col => {
+                                const columnName = col.key;
+                                return (
+                                    <div
+                                        key={`${item.id}-${columnName}`}
+                                        className="custom-data-cell"
+                                        style={{
+                                            width: col.currentWidth || col.minWidth,
+                                            minWidth: col.minWidth,
+                                            maxWidth: col.maxWidth
+                                        }}
+                                    >
+                                        {this.renderCell(item, columnName)}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    );
+                })}
             </div>
         );
     }
@@ -1041,7 +1133,8 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
 
         const isChanged = this.changeTracker.isCellChanged(item.id, columnName);
         const value = item[columnName] || '';
-        const isEditable = this.isFieldEditable(columnName);
+        // UPDATED: Pass item to check row-level editability
+        const isEditable = this.isFieldEditable(columnName, item);
 
         // CRITICAL: Log rendering decision for read-only fields (CASE-INSENSITIVE)
         if (this.state.readOnlyFieldsSet.has(columnName.toLowerCase())) {
@@ -1078,7 +1171,18 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
         const isNumeric = isNumericType(columnMetadata?.dataType);
         let readOnlyReason = '';
         if (!isEditable) {
-            if (column?.isPrimary) {
+            // Check row-level disable first
+            if (!this.isRowEditable(item)) {
+                // CASE-INSENSITIVE: Find the actual field name in the item
+                let actualValue = 'N/A';
+                if (this.props.enableRowsField) {
+                    const itemKeys = Object.keys(item);
+                    const fieldNameLower = this.props.enableRowsField.trim().toLowerCase();
+                    const matchedKey = itemKeys.find(key => key.toLowerCase() === fieldNameLower);
+                    actualValue = matchedKey ? item[matchedKey] : 'N/A';
+                }
+                readOnlyReason = `Row is read-only: ${this.props.enableRowsField} = '${actualValue}' (only '${this.props.enableRowsValue}' rows are editable)`;
+            } else if (column?.isPrimary) {
                 readOnlyReason = 'Primary key field';
             } else if (columnMetadata?.isVirtualField) {
                 readOnlyReason = 'Virtual/computed field';

@@ -60,6 +60,22 @@
               required="false"
               default-value="false"/>
 
+    <property name="enableRowsField"
+              display-name-key="Enable Rows Field"
+              description-key="Column name to check for row-level editing control. Leave empty to edit all rows. (e.g., opalcrm_ActFcst)"
+              of-type="SingleLine.Text"
+              usage="input"
+              required="false"
+              default-value=""/>
+
+    <property name="enableRowsValue"
+              display-name-key="Enable Rows Value"
+              description-key="Value that allows row editing. Only rows with this value will be editable, others will be read-only. (e.g., Forecast)"
+              of-type="SingleLine.Text"
+              usage="input"
+              required="false"
+              default-value=""/>
+
     <resources>
       <code path="index.ts" order="1"/>
       <platform-library name="React" version="16.14.0" />
