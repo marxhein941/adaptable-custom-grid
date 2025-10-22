@@ -767,7 +767,22 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
         const MIN_COLUMN_WIDTH = 50;
         const MAX_COLUMN_WIDTH = 400;
 
-        return this.props.dataset.columns.map(col => {
+        // Filter out the primary column (isPrimary property)
+        const visibleColumns = this.props.dataset.columns.filter(col => {
+            const isPrimary = (col as any).isPrimary === true;
+            if (isPrimary) {
+                logger.info(LogTag.COLUMNS, `Excluding primary column: ${col.name}`);
+            }
+            return !isPrimary;
+        });
+
+        logger.debug(LogTag.COLUMNS, `Building columns`, {
+            totalColumns: this.props.dataset.columns.length,
+            visibleColumns: visibleColumns.length,
+            excludedCount: this.props.dataset.columns.length - visibleColumns.length
+        });
+
+        return visibleColumns.map(col => {
             const isSorted = sortColumn === col.name;
 
             // Debug: Log column metadata to verify description availability
