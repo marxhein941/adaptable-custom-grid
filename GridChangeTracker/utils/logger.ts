@@ -35,6 +35,7 @@ export enum LogTag {
     AGGREGATION = '[AGGREGATION]',
     KEYBOARD = '[KEYBOARD]',
     PAGING = '[PAGING]',
+    DRAG_FILL = '[DRAG_FILL]',
 
     // Error tags
     ERROR = '[ERROR]',
