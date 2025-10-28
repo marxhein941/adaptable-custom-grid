@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+
+  <!-- Control Display Names and Descriptions -->
+  <data name="GridChangeTracker" xml:space="preserve">
+    <value>Grid Change Tracker</value>
+    <comment>Display name for the control</comment>
+  </data>
+  <data name="Grid with change tracking and aggregation" xml:space="preserve">
+    <value>Advanced grid control with inline editing, visual change tracking, and aggregation capabilities for Power Apps.</value>
+    <comment>Description of the control</comment>
+  </data>
+
+  <!-- Property Display Names -->
+  <data name="Enable Change Tracking" xml:space="preserve">
+    <value>Enable Change Tracking</value>
+    <comment>Property: enableChangeTracking display name</comment>
+  </data>
+  <data name="Show visual indicators for changed cells" xml:space="preserve">
+    <value>Show visual indicators for changed cells</value>
+    <comment>Property: enableChangeTracking description</comment>
+  </data>
+
+  <data name="Changed Cell Background Color" xml:space="preserve">
+    <value>Changed Cell Background Color</value>
+    <comment>Property: changedCellColor display name</comment>
+  </data>
+  <data name="Background color for modified cells" xml:space="preserve">
+    <value>Background color for modified cells (e.g., #FFF4CE)</value>
+    <comment>Property: changedCellColor description</comment>
+  </data>
+
+  <data name="Aggregation Mode" xml:space="preserve">
+    <value>Aggregation Mode</value>
+    <comment>Property: aggregationMode display name</comment>
+  </data>
+  <data name="Type of aggregation to display" xml:space="preserve">
+    <value>Type of aggregation to display in the footer row</value>
+    <comment>Property: aggregationMode description</comment>
+  </data>
+
+  <data name="Sum (Total)" xml:space="preserve">
+    <value>Sum (Total)</value>
+    <comment>Aggregation mode: Sum</comment>
+  </data>
+  <data name="None" xml:space="preserve">
+    <value>None</value>
+    <comment>Aggregation mode: None</comment>
+  </data>
+
+  <data name="Show Change Asterisk" xml:space="preserve">
+    <value>Show Change Asterisk</value>
+    <comment>Property: showChangeIndicator display name</comment>
+  </data>
+  <data name="Display asterisk (*) for changed cells" xml:space="preserve">
+    <value>Display asterisk (*) next to changed cell values</value>
+    <comment>Property: showChangeIndicator description</comment>
+  </data>
+
+  <data name="Read-Only Fields" xml:space="preserve">
+    <value>Read-Only Fields</value>
+    <comment>Property: readOnlyFields display name</comment>
+  </data>
+  <data name="Comma-separated list of field names that should be read-only (e.g., fieldname1,fieldname2). Can use commas or new lines as separators." xml:space="preserve">
+    <value>Comma-separated list of field names that should be read-only (e.g., fieldname1,fieldname2). Can use commas or new lines as separators.</value>
+    <comment>Property: readOnlyFields description</comment>
+  </data>
+
+  <data name="Use Description as Column Name" xml:space="preserve">
+    <value>Use Description as Column Name</value>
+    <comment>Property: useDescriptionAsColumnName display name</comment>
+  </data>
+  <data name="Use the table Description field as column headers for shorter names. Display Name will be shown in tooltips." xml:space="preserve">
+    <value>Use the table Description field as column headers for shorter names. Display Name will be shown in tooltips.</value>
+    <comment>Property: useDescriptionAsColumnName description</comment>
+  </data>
+
+  <data name="Enable Rows Field" xml:space="preserve">
+    <value>Enable Rows Field</value>
+    <comment>Property: enableRowsField display name</comment>
+  </data>
+  <data name="Column name to check for row-level editing control. Leave empty to edit all rows. (e.g., opalcrm_ActFcst)" xml:space="preserve">
+    <value>Column name to check for row-level editing control. Leave empty to edit all rows. (e.g., opalcrm_ActFcst)</value>
+    <comment>Property: enableRowsField description</comment>
+  </data>
+
+  <data name="Enable Rows Value" xml:space="preserve">
+    <value>Enable Rows Value</value>
+    <comment>Property: enableRowsValue display name</comment>
+  </data>
+  <data name="Value that allows row editing. Only rows with this value will be editable, others will be read-only. (e.g., Forecast)" xml:space="preserve">
+    <value>Value that allows row editing. Only rows with this value will be editable, others will be read-only. (e.g., Forecast)</value>
+    <comment>Property: enableRowsValue description</comment>
+  </data>
+
+  <data name="Grid Dataset" xml:space="preserve">
+    <value>Grid Dataset</value>
+    <comment>Dataset: gridDataset display name</comment>
+  </data>
+
+  <!-- UI Messages -->
+  <data name="Loading" xml:space="preserve">
+    <value>Loading...</value>
+    <comment>Loading message</comment>
+  </data>
+  <data name="No data available" xml:space="preserve">
+    <value>No data available</value>
+    <comment>Empty state message</comment>
+  </data>
+  <data name="Error loading data" xml:space="preserve">
+    <value>Error loading data</value>
+    <comment>Error message</comment>
+  </data>
+  <data name="Changes detected" xml:space="preserve">
+    <value>{0} change(s) detected</value>
+    <comment>Status message for changes, {0} will be replaced with number</comment>
+  </data>
+</root>

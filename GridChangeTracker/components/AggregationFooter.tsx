@@ -80,8 +80,8 @@ export const AggregationFooter: React.FC<IAggregationFooterProps> = (props) => {
                     const columnWidth = gridColumn?.currentWidth ?? gridColumn?.minWidth ?? 150;
 
                     // Check if column is numeric for alignment
-                    const columnMetadata = column as any;
-                    const isNumeric = isNumericType(columnMetadata.dataType);
+                    const columnMetadata = column as unknown as { dataType?: string };
+                    const isNumeric = isNumericType(columnMetadata.dataType ?? '');
 
                     return (
                         <div

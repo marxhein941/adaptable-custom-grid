@@ -19,6 +19,7 @@ import { convertValueByDataType, getColumnMetadata, isFieldEditableByType, isNum
 import { logger, log, LogTag, logReadOnlyDebug, logEditability } from '../utils/logger';
 import { VerticalFillHelper } from '../utils/VerticalFillHelper';
 import { KeyboardShortcutManager } from '../utils/keyboardShortcuts';
+import { DataRecord, EntityMetadata, EntityMetadataResponse, XrmContext } from '../types';
 
 export interface IGridProps {
     dataset: ComponentFramework.PropertyTypes.DataSet;
@@ -31,14 +32,14 @@ export interface IGridProps {
     // Row-level enable configuration
     enableRowsField?: string;      // Column to check for row-level control
     enableRowsValue?: string;      // Value that enables editing
-    onCellChange: (recordId: string, columnName: string, value: any) => void;
+    onCellChange: (recordId: string, columnName: string, value: unknown) => void;
     onSave: () => Promise<void>;
     // Add context to access WebAPI
-    context?: ComponentFramework.Context<any>;
+    context?: ComponentFramework.Context<unknown>;
 }
 
 interface IGridState {
-    currentData: any[];
+    currentData: DataRecord[];
     isLoading: boolean;
     isSaving: boolean;
     errorMessage: string | null;
@@ -76,10 +77,10 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
     private changeTracker: ChangeTracker;
     private keyboardManager: KeyboardShortcutManager;
     private successMessageTimer?: NodeJS.Timeout;
-    private debouncedNotifyChange: (recordId: string, columnName: string, value: any) => void;
+    private debouncedNotifyChange: (recordId: string, columnName: string, value: unknown) => void;
     private throttledColumnResize: (columnKey: string, deltaX: number) => void;
     private columnDescriptions = new Map<string, string>();
-    private entityMetadata = new Map<string, { isValidForUpdate: boolean; attributeType: string }>();
+    private entityMetadata = new Map<string, EntityMetadata>();
     private pageSizeSet = false; // Flag to track if we've set the max page size
     private headerRef = React.createRef<HTMLDivElement>();
     private bodyRef = React.createRef<HTMLDivElement>();
@@ -94,7 +95,7 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
         this.setupKeyboardHandlers();
 
         // Debounce cell change notifications to reduce rapid updates
-        this.debouncedNotifyChange = debounce((recordId: string, columnName: string, value: any) => {
+        this.debouncedNotifyChange = debounce((recordId: string, columnName: string, value: unknown) => {
             this.props.onCellChange(recordId, columnName, value);
         }, 300);
 
@@ -299,7 +300,7 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
      * @param item The row data object containing all column values
      * @returns true if row should be editable, false if entire row should be read-only
      */
-    private isRowEditable(item: any): boolean {
+    private isRowEditable(item: DataRecord): boolean {
         // If no row-level configuration, all rows are editable by default
         if (!this.props.enableRowsField || !this.props.enableRowsValue) {
             return true;
@@ -317,7 +318,7 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
             logger.warn(LogTag.EDITABLE,
                 `Enable rows field "${fieldNameInput}" not found in row data. Row will be read-only.`,
                 {
-                    recordId: item.id,
+                    recordId: String(item.id ?? ''),
                     availableFields: itemKeys.filter(k => !k.endsWith('_raw'))
                 }
             );
@@ -331,7 +332,7 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
                         expectedValue.toLowerCase();
 
         logger.debug(LogTag.EDITABLE,
-            `Row editability check for record ${item.id}`,
+            `Row editability check for record ${String(item.id ?? '')}`,
             {
                 fieldNameInput,
                 matchedFieldName: matchedKey,
@@ -345,7 +346,7 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
         return matches;
     }
 
-    private isFieldEditable(columnName: string, item?: any): boolean {
+    private isFieldEditable(columnName: string, item?: DataRecord): boolean {
         // FIRST: Check if the entire row is editable (row-level control)
         if (item && !this.isRowEditable(item)) {
             // CASE-INSENSITIVE: Find the actual field name in the item
@@ -354,7 +355,12 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
                 const itemKeys = Object.keys(item);
                 const fieldNameLower = this.props.enableRowsField.trim().toLowerCase();
                 const matchedKey = itemKeys.find(key => key.toLowerCase() === fieldNameLower);
-                actualValue = matchedKey ? item[matchedKey] : 'N/A';
+                if (matchedKey) {
+                    const rawVal = item[matchedKey];
+                    if (typeof rawVal === 'string' || typeof rawVal === 'number' || typeof rawVal === 'boolean') {
+                        actualValue = String(rawVal);
+                    }
+                }
             }
             logEditability(columnName, false,
                 `Row disabled: ${this.props.enableRowsField} = '${actualValue}' (expected '${this.props.enableRowsValue}')`
@@ -605,8 +611,8 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
                     });
 
                     if (response.ok) {
-                        const data = await response.json();
-                        if (data?.Attributes) {
+                        const data = await response.json() as EntityMetadataResponse;
+                        if (data?.Attributes && Array.isArray(data.Attributes)) {
                             this.processMetadataAttributes(data.Attributes);
                             console.log(`[GridComponent] Successfully loaded ${this.columnDescriptions.size} descriptions via direct Web API`);
                             this.forceUpdate();
@@ -624,18 +630,16 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
 
             // Approach 2: Use Xrm.Utility.getEntityMetadata (fallback)
             try {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const xrm = (window as any).parent?.Xrm || (window as any).Xrm;
+                const xrmContext = window as unknown as XrmContext;
+                const xrm = xrmContext.parent?.Xrm ?? xrmContext.Xrm;
 
                 if (xrm?.Utility?.getEntityMetadata) {
                     console.log('[GridComponent] Using Xrm.Utility.getEntityMetadata approach');
 
                     // Get entity metadata with attributes - this method supports attributes expansion
-                    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
                     const entityMetadata = await xrm.Utility.getEntityMetadata(entityType, ['Attributes']);
 
                     // The Attributes should be directly available
-                    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
                     const attributes = entityMetadata?.Attributes;
 
                     if (attributes && Array.isArray(attributes)) {
@@ -656,7 +660,7 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
         }
     }
 
-    private processMetadataAttributes(attributes: any[]): void {
+    private processMetadataAttributes(attributes: unknown[]): void {
         if (!attributes || !Array.isArray(attributes)) {
             console.warn('[GridComponent] No attributes found in metadata');
             return;
@@ -665,7 +669,8 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
         console.log(`[GridComponent] Processing ${attributes.length} attributes from metadata`);
         let descriptionsFound = 0;
 
-        attributes.forEach((attr: any) => {
+        attributes.forEach((attrUnknown: unknown) => {
+            const attr = attrUnknown as Record<string, unknown>;
             // Log the structure for debugging
             console.log('[GridComponent] Attribute structure:', {
                 LogicalName: attr.LogicalName,
@@ -674,18 +679,29 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
             });
 
             // Handle different metadata structures
-            const logicalName = attr.LogicalName || attr.logicalName;
-            const description = attr.Description?.UserLocalizedLabel?.Label ||
-                              attr.Description?.LocalizedLabels?.[0]?.Label ||
-                              attr.description?.userLocalizedLabel?.label ||
-                              attr.Description; // Sometimes it's just a string
-            const displayName = attr.DisplayName?.UserLocalizedLabel?.Label ||
-                              attr.DisplayName?.LocalizedLabels?.[0]?.Label ||
-                              attr.displayName?.userLocalizedLabel?.label ||
-                              attr.DisplayName; // Sometimes it's just a string
+            const logicalNameValue = attr.LogicalName ?? attr.logicalName;
+            const logicalName = typeof logicalNameValue === 'string' ? logicalNameValue : undefined;
+
+            const descObj = attr.Description as Record<string, unknown> | undefined;
+            const descLower = attr.description as Record<string, unknown> | undefined;
+            const descriptionValue =
+                (descObj?.UserLocalizedLabel as Record<string, unknown> | undefined)?.Label ??
+                (descObj?.LocalizedLabels as Record<string, unknown>[] | undefined)?.[0]?.Label ??
+                (descLower?.userLocalizedLabel as Record<string, unknown> | undefined)?.label ??
+                attr.Description;
+            const description = typeof descriptionValue === 'string' ? descriptionValue : undefined;
+
+            const dispObj = attr.DisplayName as Record<string, unknown> | undefined;
+            const dispLower = attr.displayName as Record<string, unknown> | undefined;
+            const displayNameValue =
+                (dispObj?.UserLocalizedLabel as Record<string, unknown> | undefined)?.Label ??
+                (dispObj?.LocalizedLabels as Record<string, unknown>[] | undefined)?.[0]?.Label ??
+                (dispLower?.userLocalizedLabel as Record<string, unknown> | undefined)?.label ??
+                attr.DisplayName;
+            const displayName = typeof displayNameValue === 'string' ? displayNameValue : undefined;
 
             // Use description if available, otherwise use display name
-            const tooltipText = description || displayName;
+            const tooltipText = description ?? displayName;
 
             if (logicalName) {
                 if (tooltipText) {
@@ -761,7 +777,7 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
         }
     }
 
-    private loadRecordsFromDataset(dataset: ComponentFramework.PropertyTypes.DataSet): any[] {
+    private loadRecordsFromDataset(dataset: ComponentFramework.PropertyTypes.DataSet): DataRecord[] {
         if (!dataset || !dataset.sortedRecordIds) {
             console.warn('[GridComponent] loadRecordsFromDataset - No dataset or sortedRecordIds');
             return [];
@@ -770,7 +786,7 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
         console.log(`[GridComponent] loadRecordsFromDataset - sortedRecordIds.length: ${dataset.sortedRecordIds.length}`);
 
         return dataset.sortedRecordIds.map(id => {
-            const record: any = { id: id };
+            const record: DataRecord = { id: id };
 
             dataset.columns.forEach(col => {
                 // Get both raw and formatted values
@@ -778,7 +794,7 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
                 const formattedValue = dataset.records[id].getFormattedValue(col.name);
 
                 // Use formatted value for display, but store raw value for comparisons
-                record[col.name] = formattedValue || rawValue || '';
+                record[col.name] = formattedValue ?? rawValue ?? '';
                 record[`${col.name}_raw`] = rawValue;
             });
 
@@ -812,22 +828,32 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
 
         // Sort the data
         const sortedData = [...currentData].sort((a, b) => {
-            const aValue = a[columnName] || '';
-            const bValue = b[columnName] || '';
+            const aValue = a[columnName] ?? '';
+            const bValue = b[columnName] ?? '';
+
+            // Convert to string for consistent handling (handle primitives only)
+            let aStr = '';
+            let bStr = '';
+            if (typeof aValue === 'string' || typeof aValue === 'number' || typeof aValue === 'boolean' || aValue === null || aValue === undefined) {
+                aStr = String(aValue);
+            }
+            if (typeof bValue === 'string' || typeof bValue === 'number' || typeof bValue === 'boolean' || bValue === null || bValue === undefined) {
+                bStr = String(bValue);
+            }
 
             // Handle numeric sorting
-            const aNum = parseFloat(aValue);
-            const bNum = parseFloat(bValue);
+            const aNum = parseFloat(aStr);
+            const bNum = parseFloat(bStr);
             if (!isNaN(aNum) && !isNaN(bNum)) {
                 return newIsSortDescending ? bNum - aNum : aNum - bNum;
             }
 
             // Handle string sorting
-            const aStr = String(aValue).toLowerCase();
-            const bStr = String(bValue).toLowerCase();
+            const aStrLower = aStr.toLowerCase();
+            const bStrLower = bStr.toLowerCase();
 
-            if (aStr < bStr) return newIsSortDescending ? 1 : -1;
-            if (aStr > bStr) return newIsSortDescending ? -1 : 1;
+            if (aStrLower < bStrLower) return newIsSortDescending ? 1 : -1;
+            if (aStrLower > bStrLower) return newIsSortDescending ? -1 : 1;
             return 0;
         });
 
@@ -841,7 +867,7 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
     }
 
 
-    private calculateOptimalColumnWidth = (columnName: string, displayName: string, data: any[]): number => {
+    private calculateOptimalColumnWidth = (columnName: string, displayName: string, data: DataRecord[]): number => {
         // Base width calculation factors
         const CHAR_WIDTH = 8; // Average character width in pixels
         const PADDING = 24; // Cell padding + borders + margin
@@ -855,7 +881,11 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
         // Calculate width based on content in the first 100 rows (for performance)
         const sampleData = data.slice(0, 100);
         const contentWidths = sampleData.map(row => {
-            const value = String(row[columnName] || '');
+            const rawValue = row[columnName] ?? '';
+            let value = '';
+            if (typeof rawValue === 'string' || typeof rawValue === 'number' || typeof rawValue === 'boolean' || rawValue === null || rawValue === undefined) {
+                value = String(rawValue);
+            }
             return (value.length * CHAR_WIDTH) + PADDING;
         });
 
@@ -882,7 +912,8 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
 
         // Filter out the primary column (isPrimary property)
         const visibleColumns = this.props.dataset.columns.filter(col => {
-            const isPrimary = (col as any).isPrimary === true;
+            const colWithMeta = col as unknown as { isPrimary?: boolean };
+            const isPrimary = colWithMeta.isPrimary === true;
             if (isPrimary) {
                 logger.info(LogTag.COLUMNS, `Excluding primary column: ${col.name}`);
             }
@@ -1130,7 +1161,12 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
                         const itemKeys = Object.keys(item);
                         const fieldNameLower = this.props.enableRowsField.trim().toLowerCase();
                         const matchedKey = itemKeys.find(key => key.toLowerCase() === fieldNameLower);
-                        actualFieldValue = matchedKey ? item[matchedKey] : 'N/A';
+                        if (matchedKey) {
+                            const rawVal = item[matchedKey];
+                            if (typeof rawVal === 'string' || typeof rawVal === 'number' || typeof rawVal === 'boolean') {
+                                actualFieldValue = String(rawVal);
+                            }
+                        }
                     }
 
                     const rowTitle = isRowDisabled && this.props.enableRowsField && this.props.enableRowsValue

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <manifest>
-  <control namespace="Adaptable" constructor="GridChangeTracker" version="0.0.3" display-name-key="GridChangeTracker" description-key="Grid with change tracking and aggregation" control-type="virtual" >
+  <control namespace="Adaptable" constructor="GridChangeTracker" version="1.0.0" display-name-key="GridChangeTracker" description-key="Grid with change tracking and aggregation" control-type="virtual" >
     <external-service-usage enabled="false">
     </external-service-usage>
 
@@ -81,6 +81,8 @@
       <platform-library name="React" version="16.14.0" />
       <platform-library name="Fluent" version="9.46.2" />
       <css path="css/GridChangeTracker.css" order="1" />
+      <img path="img/GridChangeTracker.svg" />
+      <resx path="strings/GridChangeTracker.1033.resx" version="1.0.0" />
     </resources>
 
     <feature-usage>

@@ -30,3 +30,13 @@ json-extract-*
 # Solution checker reports
 solution-checker-report.zip
 *.sarif
+
+# Jest testing artifacts
+coverage/
+.jest-cache/
+jest-results.json
+junit.xml
+
+# Test coverage reports
+*.lcov
+.nyc_output/
