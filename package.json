@@ -41,7 +41,7 @@
     "identity-obj-proxy": "^3.0.0",
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
-    "pcf-scripts": "^1",
+    "pcf-scripts": "^1.50.1",
     "pcf-start": "^1",
     "react": "^16.14.0",
     "ts-jest": "^29.2.5",

@@ -20,6 +20,9 @@ export function throttle<T extends (...args: any[]) => any>(
             func.apply(this, args);
             lastRan = Date.now();
             inThrottle = true;
+            setTimeout(() => {
+                inThrottle = false;
+            }, limit);
         } else {
             clearTimeout(lastFunc);
             lastFunc = setTimeout(() => {

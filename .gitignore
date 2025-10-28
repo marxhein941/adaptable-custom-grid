@@ -29,6 +29,8 @@ json-extract-*
 
 # Solution checker reports
 solution-checker-report.zip
+solution-checker-output/
+solution-checker-output*/
 *.sarif
 
 # Jest testing artifacts
