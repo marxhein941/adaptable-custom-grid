@@ -1916,8 +1916,9 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
                 // Track the change
                 this.changeTracker.trackChange(record.id, column.key, convertedValue);
 
-                // Notify parent component
-                this.debouncedNotifyChange(record.id, column.key, convertedValue);
+                // Notify parent component immediately (not debounced) for bulk fill operations
+                // Using debounce here would cause only the last cell to be saved
+                this.props.onCellChange(record.id, column.key, convertedValue);
 
                 changesMade = true;
 
@@ -1934,19 +1935,6 @@ export class GridComponent extends React.Component<IGridProps, IGridState> {
                     if (this.props.aggregationMode && Number(this.props.aggregationMode) !== Number(AggregationMode.None)) {
                         this.calculateAggregations();
                     }
-
-                    // Show success message
-                    this.setState({
-                        successMessage: `Filled ${cellsToFill.length} cell${cellsToFill.length > 1 ? 's' : ''} successfully`
-                    });
-
-                    // Clear success message after 3 seconds
-                    if (this.successMessageTimer) {
-                        clearTimeout(this.successMessageTimer);
-                    }
-                    this.successMessageTimer = setTimeout(() => {
-                        this.setState({ successMessage: null });
-                    }, 3000);
                 }
             );
         }

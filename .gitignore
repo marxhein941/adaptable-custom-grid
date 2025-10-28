@@ -26,3 +26,7 @@
 GridChangeTracker/buildConstants.ts
 
 json-extract-*
+
+# Solution checker reports
+solution-checker-report.zip
+*.sarif
